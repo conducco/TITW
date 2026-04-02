@@ -1,4 +1,4 @@
-# conducco-agents Tutorial
+# titw Tutorial
 
 Build a multi-agent research team from scratch — step by step.
 
@@ -19,7 +19,7 @@ By the end you'll have a working team with a **Lead**, a **Researcher**, and a *
 ```bash
 mkdir agent-tutorial && cd agent-tutorial
 npm init -y
-npm install conducco-agents @anthropic-ai/sdk
+npm install titw @anthropic-ai/sdk
 npm install -D typescript tsx @types/node
 ```
 
@@ -38,16 +38,16 @@ Add a `tsconfig.json`:
 }
 ```
 
-> **Why NodeNext?** It enforces ESM discipline. Imports need `.js` extensions (even for `.ts` source files). `conducco-agents` ships as ESM.
+> **Why NodeNext?** It enforces ESM discipline. Imports need `.js` extensions (even for `.ts` source files). `titw` ships as ESM.
 
 ---
 
 ## Step 2 — Understand the AgentRunner interface
 
-`conducco-agents` never calls an LLM directly. You provide an `AgentRunner` — a single async function — and the framework calls it for every agent in your team.
+`titw` never calls an LLM directly. You provide an `AgentRunner` — a single async function — and the framework calls it for every agent in your team.
 
 ```ts
-import type { AgentRunner } from 'conducco-agents'
+import type { AgentRunner } from 'titw'
 
 const runner: AgentRunner = async (params) => {
   // params.agentId        — "researcher@my-team"
@@ -79,7 +79,7 @@ Create `src/runner.ts`:
 
 ```ts
 import Anthropic from '@anthropic-ai/sdk'
-import type { AgentRunner } from 'conducco-agents'
+import type { AgentRunner } from 'titw'
 
 const client = new Anthropic()
 
@@ -151,7 +151,7 @@ export const runner: AgentRunner = async (params) => {
 Create `src/team.ts`:
 
 ```ts
-import type { TeamConfig } from 'conducco-agents'
+import type { TeamConfig } from 'titw'
 
 export const team: TeamConfig = {
   name: 'research-team',
@@ -208,7 +208,7 @@ Write in clear, concise prose. Avoid bullet-point overload.`,
 
 - `leadAgentName: 'lead'` must exactly match one member's `name`
 - Each member gets its own `model`, `maxTurns`, and `permissionMode`
-- `memory: 'project'` on the lead means it accumulates knowledge in `{cwd}/.conducco/agent-memory/lead/`
+- `memory: 'project'` on the lead means it accumulates knowledge in `{cwd}/.titw/agent-memory/lead/`
 
 ---
 
@@ -217,12 +217,12 @@ Write in clear, concise prose. Avoid bullet-point overload.`,
 Create `src/main.ts`:
 
 ```ts
-import { TeamOrchestrator, createConfig, Mailbox } from 'conducco-agents'
+import { TeamOrchestrator, createConfig, Mailbox } from 'titw'
 import { team } from './team.js'
 import { runner } from './runner.js'
 
 async function main() {
-  // Config — all paths default to {cwd}/.conducco/
+  // Config — all paths default to {cwd}/.titw/
   const config = createConfig()
 
   // Create the orchestrator
@@ -291,7 +291,7 @@ The `memory: 'project'` field on the lead's config already enables this. The `Te
 Write something to the lead's memory manually:
 
 ```ts
-import { AgentMemory } from 'conducco-agents'
+import { AgentMemory } from 'titw'
 
 const memory = new AgentMemory({
   agentType: 'lead',
@@ -326,7 +326,7 @@ The framework prepends this automatically — no changes to your runner needed.
 Instead of a fixed `setTimeout`, use `ShutdownNegotiator` to let agents finish their current task before stopping.
 
 ```ts
-import { ShutdownNegotiator, Mailbox } from 'conducco-agents'
+import { ShutdownNegotiator, Mailbox } from 'titw'
 
 const mailbox = new Mailbox({ teamsDir: config.teamsDir, teamName: team.name })
 const negotiator = new ShutdownNegotiator({ mailbox, timeoutMs: 10_000 })
@@ -368,7 +368,7 @@ if (shutdown) {
 The `researcher` agent has `permissionMode: 'bubble'`, meaning permission prompts surface to the lead. Wire this with `PermissionBridge`:
 
 ```ts
-import { PermissionBridge } from 'conducco-agents'
+import { PermissionBridge } from 'titw'
 
 const bridge = new PermissionBridge()
 
@@ -407,7 +407,7 @@ import {
   createPermissionRequest,
   isStructuredMessage,
   parseStructuredMessage,
-} from 'conducco-agents'
+} from 'titw'
 
 // Send a typed shutdown request
 const shutdownMsg = createShutdownRequest({ from: 'lead', to: 'researcher' })

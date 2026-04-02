@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'async_hooks'
-import type { ConductoConfig } from '../config.js'
+import type { TitwConfig } from '../config.js'
 import { Mailbox } from '../messaging/Mailbox.js'
 import type { TeammateMessage } from '../types/message.js'
 import { formatAgentId } from '../types/agent.js'
@@ -35,11 +35,11 @@ interface RunningTeammate {
  */
 export class InProcessBackend implements TeammateExecutor {
   readonly type = 'in-process'
-  private readonly config: ConductoConfig
+  private readonly config: TitwConfig
   private readonly storage = new AsyncLocalStorage<TeammateContext>()
   private readonly running = new Map<string, RunningTeammate>()
 
-  constructor(config: ConductoConfig) {
+  constructor(config: TitwConfig) {
     this.config = config
   }
 
@@ -52,7 +52,7 @@ export class InProcessBackend implements TeammateExecutor {
     const taskId = generateTaskId('teammate')
     const abortController = new AbortController()
     const mailbox = new Mailbox({
-      teamsDir: spawnCfg.conductoCfg.teamsDir,
+      teamsDir: spawnCfg.titwCfg.teamsDir,
       teamName: spawnCfg.teamName,
     })
 

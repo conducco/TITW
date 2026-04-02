@@ -13,8 +13,8 @@ export interface AgentMemoryOptions {
  *
  * Scopes:
  * - user:    {memoryBaseDir}/agent-memory/{type}/MEMORY.md
- * - project: {cwd}/.conducco/agent-memory/{type}/MEMORY.md      (VCS-tracked)
- * - local:   {cwd}/.conducco/agent-memory-local/{type}/MEMORY.md (not VCS-tracked)
+ * - project: {cwd}/.titw/agent-memory/{type}/MEMORY.md      (VCS-tracked)
+ * - local:   {cwd}/.titw/agent-memory-local/{type}/MEMORY.md (not VCS-tracked)
  *
  * Extracted from cc_code's `tools/AgentTool/agentMemory.ts`.
  */
@@ -34,9 +34,9 @@ export class AgentMemory {
       case 'user':
         return join(this.memoryBaseDir, 'agent-memory', this.agentType)
       case 'project':
-        return join(this.cwd, '.conducco', 'agent-memory', this.agentType)
+        return join(this.cwd, '.titw', 'agent-memory', this.agentType)
       case 'local':
-        return join(this.cwd, '.conducco', 'agent-memory-local', this.agentType)
+        return join(this.cwd, '.titw', 'agent-memory-local', this.agentType)
     }
   }
 

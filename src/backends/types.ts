@@ -1,7 +1,7 @@
 import type { TeammateMessage } from '../types/message.js'
 import type { AgentConfig } from '../types/agent.js'
 import type { AgentRunResult, AgentProgress } from '../types/task.js'
-import type { ConductoConfig } from '../config.js'
+import type { TitwConfig } from '../config.js'
 
 /**
  * Parameters passed to an AgentRunner on each invocation.
@@ -35,7 +35,7 @@ export interface TeammateSpawnConfig {
   cwd: string
   parentId: string
   runner: AgentRunner
-  conductoCfg: ConductoConfig
+  titwCfg: TitwConfig
   onIdle?: () => void
   onProgress?: (progress: AgentProgress) => void
 }

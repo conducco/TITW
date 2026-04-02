@@ -1,7 +1,7 @@
 /**
  * Three-Agent Team Example
  *
- * Demonstrates a 3-agent team (Lead + Researcher + Coder) using conducco-agents.
+ * Demonstrates a 3-agent team (Lead + Researcher + Coder) using titw.
  * The Anthropic SDK is wired as the AgentRunner.
  *
  * This is a reference implementation — it shows how to:
@@ -136,8 +136,8 @@ function createAnthropicRunner(): AgentRunner {
 
 async function main() {
   const config = createConfig({
-    teamsDir: `${process.cwd()}/.conducco/teams`,
-    memoryBaseDir: `${process.cwd()}/.conducco/memory`,
+    teamsDir: `${process.cwd()}/.titw/teams`,
+    memoryBaseDir: `${process.cwd()}/.titw/memory`,
   })
 
   const runner = createAnthropicRunner()

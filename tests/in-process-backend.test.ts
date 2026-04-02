@@ -15,7 +15,7 @@ const echoRunner: AgentRunner = async (params) => {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'conducco-test-'))
+  tempDir = mkdtempSync(join(tmpdir(), 'titw-test-'))
   backend = new InProcessBackend(createConfig({ teamsDir: join(tempDir, 'teams') }))
 })
 
@@ -39,7 +39,7 @@ describe('InProcessBackend', () => {
       cwd: tempDir,
       parentId: 'parent-123',
       runner: echoRunner,
-      conductoCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
+      titwCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
     }
     const result = await backend.spawn(config)
     expect(result.success).toBe(true)
@@ -61,7 +61,7 @@ describe('InProcessBackend', () => {
         cwd: tempDir,
         parentId: 'parent-123',
         runner: echoRunner,
-        conductoCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
+        titwCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
         onIdle: () => {
           idleCalled = true
           resolve()
@@ -91,7 +91,7 @@ describe('InProcessBackend', () => {
         })
         return { output: '', toolUseCount: 0, tokenCount: 0, stopReason: 'aborted' }
       },
-      conductoCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
+      titwCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
     }
     const result = await backend.spawn(config)
     expect(result.success).toBe(true)
@@ -119,7 +119,7 @@ describe('InProcessBackend', () => {
       cwd: tempDir,
       parentId: 'parent-123',
       runner: listeningRunner,
-      conductoCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
+      titwCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
     }
     await backend.spawn(config)
     await backend.sendMessage('listener@test-team', { from: 'lead', text: 'Hello listener!' })

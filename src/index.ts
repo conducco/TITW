@@ -1,5 +1,5 @@
 /**
- * conducco-agents — Multi-agent orchestration framework by Conducco
+ * titw — Multi-agent orchestration framework by Conducco
  *
  * A composable, LLM-provider-agnostic framework for building agent teams.
  * Handles team state, file-based messaging, 3-tier memory, and in-process
@@ -7,8 +7,8 @@
  *
  * @example
  * ```ts
- * import { TeamOrchestrator, createConfig } from 'conducco-agents'
- * import type { AgentRunner, TeamConfig } from 'conducco-agents'
+ * import { TeamOrchestrator, createConfig } from 'titw'
+ * import type { AgentRunner, TeamConfig } from 'titw'
  *
  * const runner: AgentRunner = async (params) => { ... }
  * const team: TeamConfig = { name: 'my-team', leadAgentName: 'lead', members: [...] }
@@ -21,7 +21,7 @@
 
 // Config
 export { createConfig, DEFAULT_CONFIG } from './config.js'
-export type { ConductoConfig } from './config.js'
+export type { TitwConfig } from './config.js'
 
 // Types — Agent & Team
 export {

@@ -1,4 +1,4 @@
-# conducco-agents
+# titw
 
 **LLM-provider-agnostic TypeScript framework for multi-agent team orchestration.**
 
@@ -11,7 +11,7 @@ Build declarative agent teams with file-based messaging, 3-tier memory, and in-p
 - **Provider-agnostic** — inject Anthropic, OpenAI, or any LLM via the `AgentRunner` interface
 - **Declarative teams** — define your team as a plain `TeamConfig` object with Zod validation
 - **File-based mailbox** — persistent JSON inboxes per agent; survives restarts
-- **3-tier memory** — `user` (~/.conducco), `project` (cwd/.conducco), `local` (ephemeral) scopes
+- **3-tier memory** — `user` (~/.titw), `project` (cwd/.titw), `local` (ephemeral) scopes
 - **In-process isolation** — each teammate runs in its own `AsyncLocalStorage` context
 - **Permission bridging** — workers surface permission requests to the lead via `PermissionBridge`
 - **Graceful shutdown** — mailbox-based request/response handshake before termination
@@ -29,7 +29,7 @@ Build declarative agent teams with file-based messaging, 3-tier memory, and in-p
 ## Installation
 
 ```bash
-npm install conducco-agents
+npm install titw
 ```
 
 The framework has a single runtime dependency: `zod` for config validation.
@@ -39,8 +39,8 @@ The framework has a single runtime dependency: `zod` for config validation.
 ## Quick Start
 
 ```ts
-import { TeamOrchestrator, createConfig } from 'conducco-agents'
-import type { AgentRunner, TeamConfig } from 'conducco-agents'
+import { TeamOrchestrator, createConfig } from 'titw'
+import type { AgentRunner, TeamConfig } from 'titw'
 
 // 1. Define your team
 const team: TeamConfig = {
@@ -136,10 +136,10 @@ const runner: AgentRunner = async ({
 
 ### Mailbox
 
-File-based persistent messaging between agents. Each agent has its own inbox under `.conducco/teams/<team-name>/<agent-name>/inbox.json`.
+File-based persistent messaging between agents. Each agent has its own inbox under `.titw/teams/<team-name>/<agent-name>/inbox.json`.
 
 ```ts
-import { Mailbox } from 'conducco-agents'
+import { Mailbox } from 'titw'
 
 const mailbox = new Mailbox({ teamsDir: config.teamsDir, teamName: 'my-team' })
 
@@ -162,12 +162,12 @@ Three-tier persistent memory injected into agent system prompts:
 
 | Scope     | Location                        | Use case                          |
 |-----------|----------------------------------|-----------------------------------|
-| `user`    | `~/.conducco/memory/<agent>`    | Preferences shared across projects |
-| `project` | `{cwd}/.conducco/agent-memory/<agent>` | Project-specific knowledge  |
-| `local`   | `{cwd}/.conducco/agent-memory-local/<agent>` | Ephemeral, gitignored  |
+| `user`    | `~/.titw/memory/<agent>`    | Preferences shared across projects |
+| `project` | `{cwd}/.titw/agent-memory/<agent>` | Project-specific knowledge  |
+| `local`   | `{cwd}/.titw/agent-memory-local/<agent>` | Ephemeral, gitignored  |
 
 ```ts
-import { AgentMemory } from 'conducco-agents'
+import { AgentMemory } from 'titw'
 
 const memory = new AgentMemory({
   agentType: 'researcher',
@@ -185,7 +185,7 @@ const injection = await memory.buildSystemPromptInjection('project')
 Workers escalate permission requests to the lead agent:
 
 ```ts
-import { PermissionBridge } from 'conducco-agents'
+import { PermissionBridge } from 'titw'
 
 const bridge = new PermissionBridge()
 
@@ -207,7 +207,7 @@ const ok = bridge.isPathPermitted('/project/src/index.ts', 'Write') // true
 Graceful shutdown with a mailbox-based handshake:
 
 ```ts
-import { ShutdownNegotiator } from 'conducco-agents'
+import { ShutdownNegotiator } from 'titw'
 
 const negotiator = new ShutdownNegotiator({ mailbox, pollIntervalMs: 200, timeoutMs: 5000 })
 
@@ -224,11 +224,11 @@ await negotiator.respondToShutdown('worker-agent', { approved: true, reason: 'ta
 ## Configuration
 
 ```ts
-import { createConfig } from 'conducco-agents'
+import { createConfig } from 'titw'
 
 const config = createConfig({
-  teamsDir: `${process.cwd()}/.conducco/teams`,   // default
-  memoryBaseDir: `${process.cwd()}/.conducco/memory`,
+  teamsDir: `${process.cwd()}/.titw/teams`,   // default
+  memoryBaseDir: `${process.cwd()}/.titw/memory`,
   defaultModel: 'claude-opus-4-6',
   defaultMaxTurns: 50,
   mailboxPollIntervalMs: 500,
@@ -244,7 +244,7 @@ All fields are optional — `createConfig()` with no arguments uses sensible def
 
 ```
 src/
-  config.ts                  # createConfig, ConductoConfig
+  config.ts                  # createConfig, TitwConfig
   types/
     agent.ts                 # AgentConfig, TeamConfig + Zod schemas
     message.ts               # TeammateMessage, StructuredMessage union

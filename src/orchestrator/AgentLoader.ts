@@ -1,4 +1,4 @@
-import type { ConductoConfig } from '../config.js'
+import type { TitwConfig } from '../config.js'
 import type { AgentConfig, TeamConfig } from '../types/agent.js'
 import { teamConfigSchema } from '../types/agent.js'
 
@@ -8,9 +8,9 @@ import { teamConfigSchema } from '../types/agent.js'
  * Extracted from cc_code's `tools/AgentTool/loadAgentsDir.ts`.
  */
 export class AgentLoader {
-  private readonly config: ConductoConfig
+  private readonly config: TitwConfig
 
-  constructor(config: ConductoConfig) {
+  constructor(config: TitwConfig) {
     this.config = config
   }
 

@@ -1,4 +1,4 @@
-export const FORK_BOILERPLATE_MARKER = '<conducco-fork-child>'
+export const FORK_BOILERPLATE_MARKER = '<titw-fork-child>'
 
 export interface ConversationMessage {
   role: 'user' | 'assistant'

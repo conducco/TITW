@@ -8,7 +8,7 @@ let tempDir: string
 let memory: AgentMemory
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'conducco-test-'))
+  tempDir = mkdtempSync(join(tmpdir(), 'titw-test-'))
   memory = new AgentMemory({
     agentType: 'researcher',
     cwd: tempDir,
@@ -28,12 +28,12 @@ describe('AgentMemory', () => {
 
   it('returns correct project-scope path', () => {
     const path = memory.getMemoryPath('project')
-    expect(path).toBe(join(tempDir, '.conducco', 'agent-memory', 'researcher', 'MEMORY.md'))
+    expect(path).toBe(join(tempDir, '.titw', 'agent-memory', 'researcher', 'MEMORY.md'))
   })
 
   it('returns correct local-scope path', () => {
     const path = memory.getMemoryPath('local')
-    expect(path).toBe(join(tempDir, '.conducco', 'agent-memory-local', 'researcher', 'MEMORY.md'))
+    expect(path).toBe(join(tempDir, '.titw', 'agent-memory-local', 'researcher', 'MEMORY.md'))
   })
 
   it('sanitizes colons in agent type names', () => {
@@ -49,7 +49,7 @@ describe('AgentMemory', () => {
 
   it('ensures memory directory exists on ensureDir', async () => {
     await memory.ensureDir('project')
-    const dir = join(tempDir, '.conducco', 'agent-memory', 'researcher')
+    const dir = join(tempDir, '.titw', 'agent-memory', 'researcher')
     expect(existsSync(dir)).toBe(true)
   })
 

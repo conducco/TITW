@@ -1,4 +1,4 @@
-import type { ConductoConfig } from '../config.js'
+import type { TitwConfig } from '../config.js'
 import { Mailbox } from '../messaging/Mailbox.js'
 import { AgentMemory } from '../memory/AgentMemory.js'
 import { InProcessBackend } from '../backends/InProcessBackend.js'
@@ -11,7 +11,7 @@ import { AgentLoader } from './AgentLoader.js'
 export interface TeamOrchestratorOptions {
   team: TeamConfig
   runner: AgentRunner
-  config: ConductoConfig
+  config: TitwConfig
   cwd: string
   backend?: TeammateExecutor
 }
@@ -25,7 +25,7 @@ export interface TeamOrchestratorOptions {
 export class TeamOrchestrator {
   private readonly team: TeamConfig
   private readonly runner: AgentRunner
-  private readonly config: ConductoConfig
+  private readonly config: TitwConfig
   private readonly cwd: string
   private readonly backend: TeammateExecutor
   private readonly loader: AgentLoader
@@ -90,7 +90,7 @@ export class TeamOrchestrator {
       cwd: this.cwd,
       parentId: `team-${sanitizeName(this.team.name)}`,
       runner: this.runner,
-      conductoCfg: this.config,
+      titwCfg: this.config,
     })
 
     if (result.success) {

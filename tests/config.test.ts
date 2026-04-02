@@ -4,8 +4,8 @@ import { createConfig, DEFAULT_CONFIG } from '../src/config.js'
 describe('createConfig', () => {
   it('returns defaults when called with no arguments', () => {
     const cfg = createConfig()
-    expect(cfg.teamsDir).toContain('.conducco/teams')
-    expect(cfg.memoryBaseDir).toContain('.conducco/memory')
+    expect(cfg.teamsDir).toContain('.titw/teams')
+    expect(cfg.memoryBaseDir).toContain('.titw/memory')
     expect(cfg.defaultModel).toBe('claude-opus-4-6')
     expect(cfg.defaultMaxTurns).toBe(50)
     expect(cfg.mailboxPollIntervalMs).toBe(500)

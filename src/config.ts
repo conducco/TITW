@@ -2,24 +2,23 @@ import { homedir } from 'os'
 import { join } from 'path'
 
 /**
- * Global configuration for the Conducco framework.
+ * Global configuration for the TITW framework.
  *
  * All file-based persistence paths are configurable so the framework
  * can run in CI, Docker, or alongside other tools without collision.
- * Defaults mirror the original cc_code paths but under `.conducco/`
- * to avoid conflicts with Claude Code installations.
+ * Defaults place state under `.titw/` in the home directory.
  */
-export interface ConductoConfig {
+export interface TitwConfig {
   /**
    * Root directory for team state files.
    * Each team gets a subdirectory: `{teamsDir}/{teamName}/`
-   * Default: `~/.conducco/teams`
+   * Default: `~/.titw/teams`
    */
   teamsDir: string
 
   /**
    * Root directory for agent memory files.
-   * Default: `~/.conducco/memory`
+   * Default: `~/.titw/memory`
    */
   memoryBaseDir: string
 
@@ -48,9 +47,9 @@ export interface ConductoConfig {
   maxMessageHistory: number
 }
 
-export const DEFAULT_CONFIG: ConductoConfig = {
-  teamsDir: join(homedir(), '.conducco', 'teams'),
-  memoryBaseDir: join(homedir(), '.conducco', 'memory'),
+export const DEFAULT_CONFIG: TitwConfig = {
+  teamsDir: join(homedir(), '.titw', 'teams'),
+  memoryBaseDir: join(homedir(), '.titw', 'memory'),
   defaultModel: 'claude-opus-4-6',
   defaultMaxTurns: 50,
   mailboxPollIntervalMs: 500,
@@ -58,13 +57,13 @@ export const DEFAULT_CONFIG: ConductoConfig = {
 }
 
 /**
- * Creates a `ConductoConfig` by merging provided overrides with defaults.
+ * Creates a `TitwConfig` by merging provided overrides with defaults.
  *
  * @example
  * ```ts
  * const config = createConfig({ defaultModel: 'claude-haiku-4-5-20251001' })
  * ```
  */
-export function createConfig(overrides: Partial<ConductoConfig> = {}): ConductoConfig {
+export function createConfig(overrides: Partial<TitwConfig> = {}): TitwConfig {
   return { ...DEFAULT_CONFIG, ...overrides }
 }
