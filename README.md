@@ -29,7 +29,7 @@ Build declarative agent teams with file-based messaging, 3-tier memory, and in-p
 ## Installation
 
 ```bash
-npm install titw
+npm install @conducco/titw
 ```
 
 The framework has a single runtime dependency: `zod` for config validation.
@@ -39,8 +39,8 @@ The framework has a single runtime dependency: `zod` for config validation.
 ## Quick Start
 
 ```ts
-import { TeamOrchestrator, createConfig } from 'titw'
-import type { AgentRunner, TeamConfig } from 'titw'
+import { TeamOrchestrator, createConfig } from '@conducco/titw'
+import type { AgentRunner, TeamConfig } from '@conducco/titw'
 
 // 1. Define your team
 const team: TeamConfig = {
@@ -139,7 +139,7 @@ const runner: AgentRunner = async ({
 File-based persistent messaging between agents. Each agent has its own inbox under `.titw/teams/<team-name>/<agent-name>/inbox.json`.
 
 ```ts
-import { Mailbox } from 'titw'
+import { Mailbox } from '@conducco/titw'
 
 const mailbox = new Mailbox({ teamsDir: config.teamsDir, teamName: 'my-team' })
 
@@ -167,7 +167,7 @@ Three-tier persistent memory injected into agent system prompts:
 | `local`   | `{cwd}/.titw/agent-memory-local/<agent>` | Ephemeral, gitignored  |
 
 ```ts
-import { AgentMemory } from 'titw'
+import { AgentMemory } from '@conducco/titw'
 
 const memory = new AgentMemory({
   agentType: 'researcher',
@@ -185,7 +185,7 @@ const injection = await memory.buildSystemPromptInjection('project')
 Workers escalate permission requests to the lead agent:
 
 ```ts
-import { PermissionBridge } from 'titw'
+import { PermissionBridge } from '@conducco/titw'
 
 const bridge = new PermissionBridge()
 
@@ -207,7 +207,7 @@ const ok = bridge.isPathPermitted('/project/src/index.ts', 'Write') // true
 Graceful shutdown with a mailbox-based handshake:
 
 ```ts
-import { ShutdownNegotiator } from 'titw'
+import { ShutdownNegotiator } from '@conducco/titw'
 
 const negotiator = new ShutdownNegotiator({ mailbox, pollIntervalMs: 200, timeoutMs: 5000 })
 
@@ -224,7 +224,7 @@ await negotiator.respondToShutdown('worker-agent', { approved: true, reason: 'ta
 ## Configuration
 
 ```ts
-import { createConfig } from 'titw'
+import { createConfig } from '@conducco/titw'
 
 const config = createConfig({
   teamsDir: `${process.cwd()}/.titw/teams`,   // default

@@ -7,8 +7,8 @@
  *
  * @example
  * ```ts
- * import { TeamOrchestrator, createConfig } from 'titw'
- * import type { AgentRunner, TeamConfig } from 'titw'
+ * import { TeamOrchestrator, createConfig } from '@conducco/titw'
+ * import type { AgentRunner, TeamConfig } from '@conducco/titw'
  *
  * const runner: AgentRunner = async (params) => { ... }
  * const team: TeamConfig = { name: 'my-team', leadAgentName: 'lead', members: [...] }

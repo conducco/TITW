@@ -1,7 +1,7 @@
 {
-  "name": "titw",
+  "name": "@conducco/titw",
   "version": "0.1.0",
-  "description": "Conducco multi-agent orchestration framework — composable, observable, declarative agent teams",
+  "description": "TITW multi-agent orchestration framework — composable, observable, declarative agent teams",
   "type": "module",
   "exports": {
     ".": {

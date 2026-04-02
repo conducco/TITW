@@ -19,7 +19,7 @@ By the end you'll have a working team with a **Lead**, a **Researcher**, and a *
 ```bash
 mkdir agent-tutorial && cd agent-tutorial
 npm init -y
-npm install titw @anthropic-ai/sdk
+npm install @conducco/titw @anthropic-ai/sdk
 npm install -D typescript tsx @types/node
 ```
 
@@ -47,7 +47,7 @@ Add a `tsconfig.json`:
 `titw` never calls an LLM directly. You provide an `AgentRunner` — a single async function — and the framework calls it for every agent in your team.
 
 ```ts
-import type { AgentRunner } from 'titw'
+import type { AgentRunner } from '@conducco/titw'
 
 const runner: AgentRunner = async (params) => {
   // params.agentId        — "researcher@my-team"
@@ -79,7 +79,7 @@ Create `src/runner.ts`:
 
 ```ts
 import Anthropic from '@anthropic-ai/sdk'
-import type { AgentRunner } from 'titw'
+import type { AgentRunner } from '@conducco/titw'
 
 const client = new Anthropic()
 
@@ -151,7 +151,7 @@ export const runner: AgentRunner = async (params) => {
 Create `src/team.ts`:
 
 ```ts
-import type { TeamConfig } from 'titw'
+import type { TeamConfig } from '@conducco/titw'
 
 export const team: TeamConfig = {
   name: 'research-team',
@@ -217,7 +217,7 @@ Write in clear, concise prose. Avoid bullet-point overload.`,
 Create `src/main.ts`:
 
 ```ts
-import { TeamOrchestrator, createConfig, Mailbox } from 'titw'
+import { TeamOrchestrator, createConfig, Mailbox } from '@conducco/titw'
 import { team } from './team.js'
 import { runner } from './runner.js'
 
@@ -291,7 +291,7 @@ The `memory: 'project'` field on the lead's config already enables this. The `Te
 Write something to the lead's memory manually:
 
 ```ts
-import { AgentMemory } from 'titw'
+import { AgentMemory } from '@conducco/titw'
 
 const memory = new AgentMemory({
   agentType: 'lead',
@@ -326,7 +326,7 @@ The framework prepends this automatically — no changes to your runner needed.
 Instead of a fixed `setTimeout`, use `ShutdownNegotiator` to let agents finish their current task before stopping.
 
 ```ts
-import { ShutdownNegotiator, Mailbox } from 'titw'
+import { ShutdownNegotiator, Mailbox } from '@conducco/titw'
 
 const mailbox = new Mailbox({ teamsDir: config.teamsDir, teamName: team.name })
 const negotiator = new ShutdownNegotiator({ mailbox, timeoutMs: 10_000 })
@@ -368,7 +368,7 @@ if (shutdown) {
 The `researcher` agent has `permissionMode: 'bubble'`, meaning permission prompts surface to the lead. Wire this with `PermissionBridge`:
 
 ```ts
-import { PermissionBridge } from 'titw'
+import { PermissionBridge } from '@conducco/titw'
 
 const bridge = new PermissionBridge()
 
@@ -407,7 +407,7 @@ import {
   createPermissionRequest,
   isStructuredMessage,
   parseStructuredMessage,
-} from 'titw'
+} from '@conducco/titw'
 
 // Send a typed shutdown request
 const shutdownMsg = createShutdownRequest({ from: 'lead', to: 'researcher' })
