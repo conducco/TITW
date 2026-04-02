@@ -48,22 +48,29 @@ describe('InProcessBackend', () => {
     expect(result.abortController).toBeTruthy()
   })
 
-  it('reports as inactive after quick task completes', async () => {
-    const config: TeammateSpawnConfig = {
-      agentName: 'quick',
-      teamName: 'test-team',
-      agentConfig: { name: 'quick', systemPrompt: 'Fast.' },
-      prompt: 'Quick task.',
-      systemPrompt: 'Fast.',
-      model: 'claude-opus-4-6',
-      cwd: tempDir,
-      parentId: 'parent-123',
-      runner: echoRunner,
-      conductoCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
-    }
-    await backend.spawn(config)
-    // Give the echo runner time to complete
-    await new Promise(r => setTimeout(r, 100))
+  it('reports as inactive after task completes (via onIdle)', async () => {
+    let idleCalled = false
+    const idlePromise = new Promise<void>(resolve => {
+      const config: TeammateSpawnConfig = {
+        agentName: 'quick',
+        teamName: 'test-team',
+        agentConfig: { name: 'quick', systemPrompt: 'Fast.' },
+        prompt: 'Quick task.',
+        systemPrompt: 'Fast.',
+        model: 'claude-opus-4-6',
+        cwd: tempDir,
+        parentId: 'parent-123',
+        runner: echoRunner,
+        conductoCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
+        onIdle: () => {
+          idleCalled = true
+          resolve()
+        },
+      }
+      void backend.spawn(config)
+    })
+    await idlePromise
+    expect(idleCalled).toBe(true)
     expect(await backend.isActive('quick@test-team')).toBe(false)
   })
 
@@ -90,5 +97,40 @@ describe('InProcessBackend', () => {
     expect(result.success).toBe(true)
     const killed = await backend.kill(result.agentId)
     expect(killed).toBe(true)
+  })
+
+  it('sendMessage delivers to running agent mailbox', async () => {
+    // Spawn a runner that waits briefly then reads its mailbox
+    let receivedMsg: string | undefined
+    const listeningRunner: AgentRunner = async (params) => {
+      // Small delay to ensure sendMessage fires after spawn returns
+      await new Promise(r => setTimeout(r, 20))
+      const msgs = await params.readMailbox()
+      receivedMsg = msgs[0]?.text
+      return { output: receivedMsg ?? '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+    }
+    const config: TeammateSpawnConfig = {
+      agentName: 'listener',
+      teamName: 'test-team',
+      agentConfig: { name: 'listener', systemPrompt: 'Listen.' },
+      prompt: 'Listen for messages.',
+      systemPrompt: 'Listen.',
+      model: 'claude-opus-4-6',
+      cwd: tempDir,
+      parentId: 'parent-123',
+      runner: listeningRunner,
+      conductoCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
+    }
+    await backend.spawn(config)
+    await backend.sendMessage('listener@test-team', { from: 'lead', text: 'Hello listener!' })
+    // Wait for the runner to finish
+    await new Promise(r => setTimeout(r, 100))
+    expect(receivedMsg).toBe('Hello listener!')
+  })
+
+  it('sendMessage throws when agent not found', async () => {
+    await expect(
+      backend.sendMessage('nobody@test-team', { from: 'lead', text: 'Hello' })
+    ).rejects.toThrow('Teammate nobody@test-team not found')
   })
 })

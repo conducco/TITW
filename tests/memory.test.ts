@@ -71,4 +71,17 @@ describe('AgentMemory', () => {
     expect(content).toContain('Fact 1')
     expect(content).toContain('Fact 2')
   })
+
+  it('buildSystemPromptInjection returns empty string when no memory', async () => {
+    const injection = await memory.buildSystemPromptInjection('project')
+    expect(injection).toBe('')
+  })
+
+  it('buildSystemPromptInjection wraps content in XML tag', async () => {
+    await memory.write('project', '# Memory\n- Fact 1')
+    const injection = await memory.buildSystemPromptInjection('project')
+    expect(injection).toContain('<agent-memory scope="project">')
+    expect(injection).toContain('Fact 1')
+    expect(injection).toContain('</agent-memory>')
+  })
 })
