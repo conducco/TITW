@@ -54,4 +54,29 @@ describe('AgentLoader', () => {
     const model = loader.resolveModel(sampleTeam.members[2]!, teamNoDefault)
     expect(model).toBe(cfg.defaultModel)
   })
+
+  it('resolveMaxTurns falls back to config default', () => {
+    const turns = loader.resolveMaxTurns({ name: 'a', systemPrompt: 'b' })
+    expect(turns).toBe(cfg.defaultMaxTurns)
+  })
+
+  it('resolveMaxTurns uses agent override', () => {
+    const turns = loader.resolveMaxTurns({ name: 'a', systemPrompt: 'b', maxTurns: 10 })
+    expect(turns).toBe(10)
+  })
+
+  it('resolveTools returns all tools when none specified', () => {
+    const tools = loader.resolveTools({ name: 'a', systemPrompt: 'b' })
+    expect(tools).toEqual(['*'])
+  })
+
+  it('resolveTools filters disallowedTools', () => {
+    const tools = loader.resolveTools({
+      name: 'a',
+      systemPrompt: 'b',
+      tools: ['Read', 'Edit', 'Bash'],
+      disallowedTools: ['Bash'],
+    })
+    expect(tools).toEqual(['Read', 'Edit'])
+  })
 })

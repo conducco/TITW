@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { TeamOrchestrator } from '../src/orchestrator/TeamOrchestrator.js'
+import { Mailbox } from '../src/messaging/Mailbox.js'
 import { createConfig } from '../src/config.js'
 import type { TeamConfig } from '../src/types/agent.js'
 import type { AgentRunner } from '../src/backends/types.js'
@@ -67,5 +68,49 @@ describe('TeamOrchestrator', () => {
     const badTeam: TeamConfig = { ...sampleTeam, leadAgentName: 'nobody' }
     const orch = new TeamOrchestrator({ team: badTeam, runner: echoRunner, config: cfg, cwd: tempDir })
     await expect(orch.start()).rejects.toThrow('leadAgentName')
+  })
+
+  it('broadcast writes to all member inboxes', async () => {
+    const cfg = createConfig({ teamsDir: join(tempDir, 'teams') })
+    const orch = new TeamOrchestrator({ team: sampleTeam, runner: echoRunner, config: cfg, cwd: tempDir })
+    await orch.start()
+    await orch.broadcast({ from: 'system', text: 'All hands meeting', summary: 'meeting' })
+
+    const mailbox = new Mailbox({ teamsDir: join(tempDir, 'teams'), teamName: 'test-squad' })
+    for (const name of sampleTeam.members.map(m => m.name)) {
+      const msgs = await mailbox.readAll(name)
+      expect(msgs.some(m => m.text === 'All hands meeting')).toBe(true)
+    }
+    await orch.stop()
+  })
+
+  it('spawns members with memory injection when agent has memory scope', async () => {
+    const teamWithMemory: TeamConfig = {
+      name: 'memory-team',
+      leadAgentName: 'lead',
+      members: [
+        { name: 'lead', systemPrompt: 'You lead.' },
+        { name: 'mem-worker', systemPrompt: 'You remember.', memory: 'project' },
+      ],
+    }
+    // Write some existing memory for the agent
+    const { AgentMemory } = await import('../src/memory/AgentMemory.js')
+    const mem = new AgentMemory({ agentType: 'mem-worker', cwd: tempDir, memoryBaseDir: join(tempDir, 'memory') })
+    await mem.write('project', '# Memory\n- Important fact')
+
+    let capturedSystemPrompt = ''
+    const capturingRunner: typeof echoRunner = async (params) => {
+      capturedSystemPrompt = params.systemPrompt
+      return { output: 'done', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+    }
+
+    const cfg = createConfig({ teamsDir: join(tempDir, 'teams'), memoryBaseDir: join(tempDir, 'memory') })
+    const orch = new TeamOrchestrator({ team: teamWithMemory, runner: capturingRunner, config: cfg, cwd: tempDir })
+    await orch.start()
+    // Give spawn time to set capturedSystemPrompt
+    await new Promise(r => setTimeout(r, 50))
+    expect(capturedSystemPrompt).toContain('Important fact')
+    expect(capturedSystemPrompt).toContain('<agent-memory')
+    await orch.stop()
   })
 })
