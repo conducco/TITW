@@ -24,6 +24,13 @@ interface RunningTeammate {
   context: TeammateContext
 }
 
+const defaultCallMcp = async (name: string): Promise<never> => {
+  throw new Error(
+    `callMcpTool("${name}") was called but no mcpServers are configured for this agent. ` +
+    `Add mcpServers to AgentConfig.`
+  )
+}
+
 /**
  * In-process execution backend.
  *
@@ -85,7 +92,7 @@ export class InProcessBackend implements TeammateExecutor {
             }
           },
           mcpTools: spawnCfg.mcpTools ?? [],
-          callMcpTool: spawnCfg.callMcpTool ?? (() => Promise.resolve(null)),
+          callMcpTool: spawnCfg.callMcpTool ?? defaultCallMcp,
           ...(spawnCfg.onProgress !== undefined ? { onProgress: spawnCfg.onProgress } : {}),
         })
       } catch (err: unknown) {

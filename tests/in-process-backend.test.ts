@@ -133,4 +133,63 @@ describe('InProcessBackend', () => {
       backend.sendMessage('nobody@test-team', { from: 'lead', text: 'Hello' })
     ).rejects.toThrow('Teammate nobody@test-team not found')
   })
+
+  it('passes mcpTools and callMcpTool from SpawnConfig to runner params', async () => {
+    let receivedTools: unknown[] = []
+    let receivedCaller: unknown = null
+
+    const mockCall = async (_name: string, _args: Record<string, unknown>) => ({ result: 'ok' })
+
+    const idlePromise = new Promise<void>(resolve => {
+      void backend.spawn({
+        agentName: 'mcp-agent',
+        teamName: 'test-team',
+        agentConfig: { name: 'mcp-agent', systemPrompt: 'Test.' },
+        prompt: 'Test.',
+        systemPrompt: 'Test.',
+        model: 'claude-opus-4-6',
+        cwd: tempDir,
+        parentId: 'parent',
+        runner: async (params) => {
+          receivedTools = params.mcpTools
+          receivedCaller = params.callMcpTool
+          return { output: '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+        },
+        titwCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
+        mcpTools: [{ name: 'my_tool', inputSchema: { type: 'object' } }],
+        callMcpTool: mockCall,
+        onIdle: resolve,
+      })
+    })
+
+    await idlePromise
+    expect(receivedTools).toEqual([{ name: 'my_tool', inputSchema: { type: 'object' } }])
+    expect(receivedCaller).toBe(mockCall)
+  })
+
+  it('provides default empty mcpTools when not supplied', async () => {
+    let receivedTools: unknown = 'not-set'
+
+    const idlePromise = new Promise<void>(resolve => {
+      void backend.spawn({
+        agentName: 'no-mcp',
+        teamName: 'test-team',
+        agentConfig: { name: 'no-mcp', systemPrompt: 'Test.' },
+        prompt: 'Test.',
+        systemPrompt: 'Test.',
+        model: 'claude-opus-4-6',
+        cwd: tempDir,
+        parentId: 'parent',
+        runner: async (params) => {
+          receivedTools = params.mcpTools
+          return { output: '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+        },
+        titwCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
+        onIdle: resolve,
+      })
+    })
+
+    await idlePromise
+    expect(receivedTools).toEqual([])
+  })
 })
