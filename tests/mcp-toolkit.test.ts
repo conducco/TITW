@@ -108,4 +108,39 @@ describe('MCPToolkit', () => {
       MCPToolkit.connect([{ type: 'stdio', command: 'node', args: [] }])
     ).rejects.toThrow(/reserved/)
   })
+
+  it('deduplicates colliding tool names, last server wins', async () => {
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
+
+    // First server returns a 'read_file' tool
+    vi.mocked(Client)
+      .mockImplementationOnce(() => ({
+        connect: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [{ name: 'read_file', description: 'from server A', inputSchema: { type: 'object' } }],
+        }),
+        callTool: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'server A result' }] }),
+      }))
+      .mockImplementationOnce(() => ({
+        connect: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [{ name: 'read_file', description: 'from server B', inputSchema: { type: 'object' } }],
+        }),
+        callTool: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'server B result' }] }),
+      }))
+
+    const servers: MCPServerConfig[] = [
+      { type: 'stdio', command: 'server-a', args: [] },
+      { type: 'stdio', command: 'server-b', args: [] },
+    ]
+    const toolkit = await MCPToolkit.connect(servers)
+
+    // Only one tool with that name should be exposed (deduplication)
+    const tools = toolkit.tools.filter(t => t.name === 'read_file')
+    expect(tools).toHaveLength(1)
+
+    await toolkit.disconnect()
+  })
 })
