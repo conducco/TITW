@@ -30,7 +30,7 @@ export {
 } from './types/agent.js'
 export type {
   AgentConfig, TeamConfig, TeamAllowedPath,
-  PermissionMode, AgentMemoryScope, MCPServerConfig, ModelSpec,
+  PermissionMode, AgentMemoryScope, MCPServerConfig, MCPToolSchema, ModelSpec,
 } from './types/agent.js'
 
 // Types — Messages
