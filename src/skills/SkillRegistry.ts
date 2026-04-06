@@ -53,9 +53,10 @@ async function loadFromPackage(packageName: string, cwd: string): Promise<Parsed
 
 function wrapSkill(skill: ParsedSkill): string {
   let content = skill.content
-  if (Buffer.byteLength(content, 'utf-8') > SKILL_SIZE_LIMIT) {
+  const buf = Buffer.from(content, 'utf-8')
+  if (buf.byteLength > SKILL_SIZE_LIMIT) {
     console.warn(`[SkillRegistry] Skill "${skill.name}" exceeds 50KB, truncating.`)
-    content = content.slice(0, SKILL_SIZE_LIMIT) + '\n<!-- skill truncated -->'
+    content = buf.subarray(0, SKILL_SIZE_LIMIT).toString('utf-8') + '\n<!-- skill truncated -->'
   }
   return `<skill name="${skill.name}">\n${content}\n</skill>`
 }
@@ -73,7 +74,8 @@ export class SkillRegistry {
     const seenNames = new Set<string>()
 
     for (const spec of skills) {
-      const isPath = spec.startsWith('.') || spec.startsWith('/')
+      const isNpmPackage = /^@?[a-z0-9_.-]+\/[a-z0-9_.-]/.test(spec) && !spec.startsWith('.')
+      const isPath = !isNpmPackage
       const skillPath = spec.startsWith('/') ? spec : join(cwd, spec)
       const skill = isPath
         ? await loadFromPath(skillPath)
