@@ -28,6 +28,7 @@ export class MCPToolkit {
     const connected: ConnectedServer[] = []
 
     for (const config of configs) {
+      const label = config.command ?? config.url ?? 'unknown'
       const client = new Client({ name: 'titw', version: '1.0' }, { capabilities: {} })
 
       let transport: unknown
@@ -44,21 +45,25 @@ export class MCPToolkit {
       }
 
       try {
-        await Promise.race([
-          client.connect(transport),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error(`MCP server timed out`)),
-              config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-            )
-          ),
-        ])
-      } catch (err: unknown) {
-        if (config.required === true) {
-          throw err
+        let timeoutId: ReturnType<typeof setTimeout> | undefined
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error(`MCP server "${label}" timed out after ${config.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`)),
+            config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+          )
+        })
+        try {
+          await Promise.race([client.connect(transport), timeoutPromise])
+        } finally {
+          clearTimeout(timeoutId)
         }
-        const msg = err instanceof Error ? err.message : String(err)
-        console.warn(`[MCPToolkit] Skipping non-required MCP server (${config.command ?? config.url}): ${msg}`)
+      } catch (err: unknown) {
+        const msg = `[MCPToolkit] Failed to connect to MCP server "${label}": ${(err as Error).message}`
+        if (config.required) {
+          await Promise.allSettled(connected.map(s => s.client.close()))
+          throw new Error(msg)
+        }
+        console.warn(msg)
         continue
       }
 
@@ -116,6 +121,8 @@ export class MCPToolkit {
     try {
       const result = await ownerServer.client.callTool({ name: toolName, arguments: args })
       return (result as { content: unknown }).content
+    // Returns a structured error result (never throws) so the LLM can receive it as a tool_result
+    // and react to the failure gracefully, rather than causing an unhandled exception.
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       console.warn(`[MCPToolkit] Tool call "${toolName}" failed: ${message}`)

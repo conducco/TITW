@@ -29,6 +29,8 @@ vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => ({
 }))
 
 describe('MCPToolkit', () => {
+  beforeEach(() => vi.clearAllMocks())
+
   it('returns empty tools when no servers configured', async () => {
     const toolkit = await MCPToolkit.connect([])
     expect(toolkit.tools).toEqual([])
