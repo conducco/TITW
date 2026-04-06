@@ -24,7 +24,7 @@ interface RunningTeammate {
   context: TeammateContext
 }
 
-const defaultCallMcp = async (name: string): Promise<never> => {
+const defaultCallMcp = async (name: string, _args: Record<string, unknown>): Promise<never> => {
   throw new Error(
     `callMcpTool("${name}") was called but no mcpServers are configured for this agent. ` +
     `Add mcpServers to AgentConfig.`
