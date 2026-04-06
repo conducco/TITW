@@ -7,6 +7,8 @@ import type { TeamConfig } from '../types/agent.js'
 import { sanitizeName } from '../types/agent.js'
 import type { TeammateMessage } from '../types/message.js'
 import { AgentLoader } from './AgentLoader.js'
+import { SkillRegistry } from '../skills/SkillRegistry.js'
+import { MCPToolkit } from '../backends/MCPToolkit.js'
 
 export interface TeamOrchestratorOptions {
   team: TeamConfig
@@ -78,7 +80,14 @@ export class TeamOrchestrator {
       ? await new AgentMemory({ agentType: agentConfig.name, cwd: this.cwd, memoryBaseDir: this.config.memoryBaseDir })
           .buildSystemPromptInjection(agentConfig.memory)
       : ''
-    const systemPrompt = agentConfig.systemPrompt + memoryInjection
+
+    const skillInjection = agentConfig.skills?.length
+      ? await SkillRegistry.load(agentConfig.skills, this.cwd)
+      : ''
+
+    const toolkit = await MCPToolkit.connect(agentConfig.mcpServers ?? [])
+
+    const systemPrompt = agentConfig.systemPrompt + skillInjection + memoryInjection
 
     const result = await this.backend.spawn({
       agentName: agentConfig.name,
@@ -91,6 +100,11 @@ export class TeamOrchestrator {
       parentId: `team-${sanitizeName(this.team.name)}`,
       runner: this.runner,
       titwCfg: this.config,
+      mcpTools: toolkit.tools,
+      callMcpTool: (name, args) => toolkit.call(name, args),
+      onIdle: () => {
+        void toolkit.disconnect()
+      },
     })
 
     if (result.success) {

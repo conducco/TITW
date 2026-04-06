@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { TeamOrchestrator } from '../src/orchestrator/TeamOrchestrator.js'
@@ -9,6 +9,7 @@ import type { TeamConfig } from '../src/types/agent.js'
 import type { AgentRunner } from '../src/backends/types.js'
 
 let tempDir: string
+let config: ReturnType<typeof createConfig>
 
 const echoRunner: AgentRunner = async (params) => ({
   output: `echo:${params.prompt}`,
@@ -26,7 +27,12 @@ const sampleTeam: TeamConfig = {
   ],
 }
 
-beforeEach(() => { tempDir = mkdtempSync(join(tmpdir(), 'conducco-test-')) })
+const team = sampleTeam
+
+beforeEach(() => {
+  tempDir = mkdtempSync(join(tmpdir(), 'conducco-test-'))
+  config = createConfig({ teamsDir: join(tempDir, 'teams') })
+})
 afterEach(() => { rmSync(tempDir, { recursive: true, force: true }) })
 
 describe('TeamOrchestrator', () => {
@@ -112,5 +118,43 @@ describe('TeamOrchestrator', () => {
     expect(capturedSystemPrompt).toContain('Important fact')
     expect(capturedSystemPrompt).toContain('<agent-memory')
     await orch.stop()
+  })
+
+  it('injects skill content into systemPrompt when agent has skills', async () => {
+    const skillFile = join(tempDir, 'test-skill.md')
+    writeFileSync(skillFile, '---\nname: test-skill\n---\nAlways cite sources.')
+
+    let capturedSystemPrompt = ''
+    const capturingRunner: AgentRunner = async (params) => {
+      capturedSystemPrompt = params.systemPrompt
+      return { output: '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+    }
+
+    const teamWithSkill: TeamConfig = {
+      name: 'skill-test-team',
+      leadAgentName: 'lead',
+      members: [{ name: 'lead', systemPrompt: 'Base prompt.', skills: [skillFile] }],
+    }
+
+    const orch = new TeamOrchestrator({ team: teamWithSkill, runner: capturingRunner, config, cwd: tempDir })
+    await orch.start()
+    await new Promise(r => setTimeout(r, 50))
+    await orch.stop()
+
+    expect(capturedSystemPrompt).toContain('<skill name="test-skill">')
+    expect(capturedSystemPrompt).toContain('Always cite sources.')
+  })
+
+  it('passes empty mcpTools when agent has no mcpServers', async () => {
+    let capturedTools: unknown[] = ['not-set' as unknown]
+    const capturingRunner: AgentRunner = async (params) => {
+      capturedTools = params.mcpTools
+      return { output: '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+    }
+    const orch = new TeamOrchestrator({ team, runner: capturingRunner, config, cwd: tempDir })
+    await orch.start()
+    await new Promise(r => setTimeout(r, 50))
+    await orch.stop()
+    expect(capturedTools).toEqual([])
   })
 })

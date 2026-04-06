@@ -84,6 +84,8 @@ export class InProcessBackend implements TeammateExecutor {
               await mailbox.write(to, { ...message, from: spawnCfg.agentName })
             }
           },
+          mcpTools: spawnCfg.mcpTools ?? [],
+          callMcpTool: spawnCfg.callMcpTool ?? (() => Promise.resolve(null)),
           ...(spawnCfg.onProgress !== undefined ? { onProgress: spawnCfg.onProgress } : {}),
         })
       } catch (err: unknown) {
