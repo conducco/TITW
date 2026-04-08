@@ -7,6 +7,8 @@ import { Mailbox } from '../src/messaging/Mailbox.js'
 import { createConfig } from '../src/config.js'
 import type { TeamConfig } from '../src/types/agent.js'
 import type { AgentRunner } from '../src/backends/types.js'
+import { FileProvider } from '../src/memory/FileProvider.js'
+import type { Triple } from '../src/types/provider.js'
 
 let tempDir: string
 let config: ReturnType<typeof createConfig>
@@ -156,5 +158,120 @@ describe('TeamOrchestrator', () => {
     await new Promise(r => setTimeout(r, 50))
     await orch.stop()
     expect(capturedTools).toEqual([])
+  })
+})
+
+describe('TeamOrchestrator with memoryProvider', () => {
+  it('uses memoryProvider.buildSystemPromptInjection instead of AgentMemory when set', async () => {
+    let capturedPrompt = ''
+    const capturingRunner: AgentRunner = async (params) => {
+      capturedPrompt = params.systemPrompt
+      return { output: '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+    }
+
+    const provider = new FileProvider({ cwd: tempDir, memoryBaseDir: join(tempDir, 'memory') })
+    const { AgentMemory } = await import('../src/memory/AgentMemory.js')
+    const mem = new AgentMemory({ agentType: 'lead', cwd: tempDir, memoryBaseDir: join(tempDir, 'memory') })
+    await mem.write('project', '# Memory\n- Provider injected fact')
+
+    const teamWithProvider: TeamConfig = {
+      name: 'provider-team',
+      leadAgentName: 'lead',
+      members: [{ name: 'lead', systemPrompt: 'Base.', memory: 'project' }],
+    }
+    const cfg = createConfig({ teamsDir: join(tempDir, 'teams'), memoryBaseDir: join(tempDir, 'memory') })
+    const orch = new TeamOrchestrator({ team: teamWithProvider, runner: capturingRunner, config: cfg, cwd: tempDir, memoryProvider: provider })
+    await orch.start()
+    await new Promise(r => setTimeout(r, 50))
+    await orch.stop()
+
+    expect(capturedPrompt).toContain('Provider injected fact')
+  })
+})
+
+describe('TeamOrchestrator observerAgent CC', () => {
+  it('CCs all messages to observerAgent inbox', async () => {
+    const teamWithObserver: TeamConfig = {
+      name: 'observer-team',
+      leadAgentName: 'lead',
+      members: [
+        { name: 'lead', systemPrompt: 'You lead.' },
+        { name: 'kgc', systemPrompt: 'You observe.' },
+      ],
+      observerAgent: 'kgc',
+    }
+    const cfg = createConfig({ teamsDir: join(tempDir, 'teams') })
+    const orch = new TeamOrchestrator({ team: teamWithObserver, runner: echoRunner, config: cfg, cwd: tempDir })
+    await orch.start()
+    await orch.sendMessage('lead', { from: 'user', text: 'Hello lead' })
+
+    const mailbox = new Mailbox({ teamsDir: join(tempDir, 'teams'), teamName: 'observer-team' })
+    const kgcMsgs = await mailbox.readAll('kgc')
+    expect(kgcMsgs.some(m => m.text === 'Hello lead')).toBe(true)
+    await orch.stop()
+  })
+
+  it('passes writeMemory to observerAgent runner params', async () => {
+    let capturedWriteMemory: ((triples: Triple[]) => Promise<void>) | undefined
+
+    const observerRunner: AgentRunner = async (params) => {
+      capturedWriteMemory = params.writeMemory
+      return { output: '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+    }
+
+    const provider = new FileProvider({ cwd: tempDir, memoryBaseDir: join(tempDir, 'memory') })
+    const teamWithObserver: TeamConfig = {
+      name: 'writememory-team',
+      leadAgentName: 'lead',
+      members: [
+        { name: 'lead', systemPrompt: 'You lead.' },
+        { name: 'kgc', systemPrompt: 'You observe.' },
+      ],
+      observerAgent: 'kgc',
+    }
+    const cfg = createConfig({ teamsDir: join(tempDir, 'teams') })
+    const orch = new TeamOrchestrator({
+      team: teamWithObserver,
+      runner: async (params) => params.agentId.startsWith('kgc') ? observerRunner(params) : echoRunner(params),
+      config: cfg,
+      cwd: tempDir,
+      memoryProvider: provider,
+    })
+    await orch.start()
+    await new Promise(r => setTimeout(r, 50))
+    await orch.stop()
+
+    expect(capturedWriteMemory).toBeDefined()
+  })
+
+  it('does NOT pass writeMemory to non-observer agents', async () => {
+    let leadWriteMemory: unknown = 'not-checked'
+
+    const provider = new FileProvider({ cwd: tempDir, memoryBaseDir: join(tempDir, 'memory') })
+    const teamWithObserver: TeamConfig = {
+      name: 'no-writememory-team',
+      leadAgentName: 'lead',
+      members: [
+        { name: 'lead', systemPrompt: 'You lead.' },
+        { name: 'kgc', systemPrompt: 'You observe.' },
+      ],
+      observerAgent: 'kgc',
+    }
+    const cfg = createConfig({ teamsDir: join(tempDir, 'teams') })
+    const orch = new TeamOrchestrator({
+      team: teamWithObserver,
+      runner: async (params) => {
+        if (params.agentId.startsWith('lead')) leadWriteMemory = params.writeMemory
+        return { output: '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+      },
+      config: cfg,
+      cwd: tempDir,
+      memoryProvider: provider,
+    })
+    await orch.start()
+    await new Promise(r => setTimeout(r, 50))
+    await orch.stop()
+
+    expect(leadWriteMemory).toBeUndefined()
   })
 })

@@ -94,6 +94,7 @@ export class InProcessBackend implements TeammateExecutor {
           mcpTools: spawnCfg.mcpTools ?? [],
           callMcpTool: spawnCfg.callMcpTool ?? defaultCallMcp,
           ...(spawnCfg.onProgress !== undefined ? { onProgress: spawnCfg.onProgress } : {}),
+          ...(spawnCfg.writeMemory !== undefined ? { writeMemory: spawnCfg.writeMemory } : {}),
         })
       } catch (err: unknown) {
         if (!abortController.signal.aborted) {

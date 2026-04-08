@@ -9,6 +9,7 @@ import type { TeammateMessage } from '../types/message.js'
 import { AgentLoader } from './AgentLoader.js'
 import { SkillRegistry } from '../skills/SkillRegistry.js'
 import { MCPToolkit } from '../backends/MCPToolkit.js'
+import type { IMemoryProvider, Triple } from '../types/provider.js'
 
 export interface TeamOrchestratorOptions {
   team: TeamConfig
@@ -16,6 +17,7 @@ export interface TeamOrchestratorOptions {
   config: TitwConfig
   cwd: string
   backend?: TeammateExecutor
+  memoryProvider?: IMemoryProvider
 }
 
 /**
@@ -33,6 +35,7 @@ export class TeamOrchestrator {
   private readonly loader: AgentLoader
   private readonly mailbox: Mailbox
   private readonly spawned = new Map<string, TeammateSpawnResult>()
+  private readonly memoryProvider: IMemoryProvider | undefined
   private _isRunning = false
 
   constructor(options: TeamOrchestratorOptions) {
@@ -42,9 +45,11 @@ export class TeamOrchestrator {
     this.cwd = options.cwd
     this.backend = options.backend ?? new InProcessBackend(options.config)
     this.loader = new AgentLoader(options.config)
+    this.memoryProvider = options.memoryProvider
     this.mailbox = new Mailbox({
       teamsDir: options.config.teamsDir,
       teamName: sanitizeName(options.team.name),
+      ...(options.team.observerAgent !== undefined ? { observerAgent: options.team.observerAgent } : {}),
     })
   }
 
@@ -76,10 +81,20 @@ export class TeamOrchestrator {
 
   private async _spawnMember(agentConfig: TeamConfig['members'][number]): Promise<void> {
     const model = this.loader.resolveModel(agentConfig, this.team)
-    const memoryInjection = agentConfig.memory
-      ? await new AgentMemory({ agentType: agentConfig.name, cwd: this.cwd, memoryBaseDir: this.config.memoryBaseDir })
-          .buildSystemPromptInjection(agentConfig.memory)
-      : ''
+
+    // Memory injection: use provider if set, else fall back to AgentMemory
+    let memoryInjection = ''
+    if (agentConfig.memory) {
+      if (this.memoryProvider) {
+        memoryInjection = await this.memoryProvider.buildSystemPromptInjection(agentConfig.name, agentConfig.memory)
+      } else {
+        memoryInjection = await new AgentMemory({
+          agentType: agentConfig.name,
+          cwd: this.cwd,
+          memoryBaseDir: this.config.memoryBaseDir,
+        }).buildSystemPromptInjection(agentConfig.memory)
+      }
+    }
 
     const skillInjection = agentConfig.skills?.length
       ? await SkillRegistry.load(agentConfig.skills, this.cwd)
@@ -88,6 +103,13 @@ export class TeamOrchestrator {
     const toolkit = await MCPToolkit.connect(agentConfig.mcpServers ?? [])
 
     const systemPrompt = agentConfig.systemPrompt + skillInjection + memoryInjection
+
+    // writeMemory: only wired for the observer agent when a provider is set
+    const isObserver = agentConfig.name === this.team.observerAgent
+    const writeMemory: ((triples: Triple[]) => Promise<void>) | undefined =
+      isObserver && this.memoryProvider
+        ? (triples) => this.memoryProvider!.write(agentConfig.name, agentConfig.memory ?? 'project', triples)
+        : undefined
 
     const result = await this.backend.spawn({
       agentName: agentConfig.name,
@@ -102,6 +124,7 @@ export class TeamOrchestrator {
       titwCfg: this.config,
       mcpTools: toolkit.tools,
       callMcpTool: (name, args) => toolkit.call(name, args),
+      ...(writeMemory !== undefined ? { writeMemory } : {}),
       onIdle: () => {
         void toolkit.disconnect()
       },

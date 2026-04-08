@@ -47,6 +47,7 @@ export interface TeammateSpawnConfig {
   titwCfg: TitwConfig
   onIdle?: () => void
   onProgress?: (progress: AgentProgress) => void
+  writeMemory?: (triples: Triple[]) => Promise<void>
 }
 
 export interface TeammateSpawnResult {
