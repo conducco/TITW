@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { AgentMemory } from '../src/memory/AgentMemory.js'
+import { FileProvider } from '../src/memory/FileProvider.js'
+import type { Triple } from '../src/types/provider.js'
 
 let tempDir: string
 let memory: AgentMemory
@@ -83,5 +85,41 @@ describe('AgentMemory', () => {
     expect(injection).toContain('<agent-memory scope="project">')
     expect(injection).toContain('Fact 1')
     expect(injection).toContain('</agent-memory>')
+  })
+})
+
+describe('FileProvider', () => {
+  it('buildSystemPromptInjection delegates to AgentMemory — returns empty when no memory', async () => {
+    const provider = new FileProvider({ cwd: tempDir, memoryBaseDir: join(tempDir, 'user-memory') })
+    const result = await provider.buildSystemPromptInjection('researcher', 'project')
+    expect(result).toBe('')
+  })
+
+  it('buildSystemPromptInjection returns wrapped content when memory exists', async () => {
+    await memory.write('project', '# Memory\n- Existing fact')
+    const provider = new FileProvider({ cwd: tempDir, memoryBaseDir: join(tempDir, 'user-memory') })
+    const result = await provider.buildSystemPromptInjection('researcher', 'project')
+    expect(result).toContain('<agent-memory')
+    expect(result).toContain('Existing fact')
+  })
+
+  it('write appends triples as markdown bullets', async () => {
+    const provider = new FileProvider({ cwd: tempDir, memoryBaseDir: join(tempDir, 'user-memory') })
+    const triples: Triple[] = [
+      { subject: 'Alice', predicate: 'manages', object: 'ProjectAlpha' },
+      { subject: 'Bob', predicate: 'reports-to', object: 'Alice', weight: 0.9 },
+    ]
+    await provider.write('researcher', 'project', triples)
+
+    const content = await memory.read('project')
+    expect(content).toContain('- Alice manages ProjectAlpha')
+    expect(content).toContain('- Bob reports-to Alice (weight: 0.9)')
+  })
+
+  it('write creates file if it does not exist', async () => {
+    const provider = new FileProvider({ cwd: tempDir, memoryBaseDir: join(tempDir, 'user-memory') })
+    await provider.write('researcher', 'local', [{ subject: 'X', predicate: 'is', object: 'Y' }])
+    const content = await memory.read('local')
+    expect(content).toContain('- X is Y')
   })
 })
