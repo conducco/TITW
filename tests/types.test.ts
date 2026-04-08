@@ -100,3 +100,26 @@ describe('parseAgentId', () => {
     expect(parseAgentId('no-at-sign')).toBeNull()
   })
 })
+
+import type { IMemoryProvider, Triple } from '../src/types/provider.js'
+
+describe('IMemoryProvider structural types', () => {
+  it('Triple allows weight to be optional', () => {
+    const t: Triple = { subject: 'Alice', predicate: 'manages', object: 'ProjectAlpha' }
+    expect(t.weight).toBeUndefined()
+  })
+
+  it('Triple accepts weight when provided', () => {
+    const t: Triple = { subject: 'Alice', predicate: 'manages', object: 'ProjectAlpha', weight: 0.8 }
+    expect(t.weight).toBe(0.8)
+  })
+
+  it('IMemoryProvider shape is satisfied by a mock object', () => {
+    const provider: IMemoryProvider = {
+      buildSystemPromptInjection: async () => '',
+      write: async () => {},
+    }
+    expect(typeof provider.buildSystemPromptInjection).toBe('function')
+    expect(typeof provider.write).toBe('function')
+  })
+})
