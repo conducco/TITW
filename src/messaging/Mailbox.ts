@@ -5,6 +5,7 @@ import type { TeammateMessage } from '../types/message.js'
 export interface MailboxOptions {
   teamsDir: string
   teamName: string
+  observerAgent?: string
 }
 
 export type IncomingMessage = Omit<TeammateMessage, 'timestamp' | 'read'>
@@ -21,10 +22,12 @@ export type IncomingMessage = Omit<TeammateMessage, 'timestamp' | 'read'>
 export class Mailbox {
   private readonly teamsDir: string
   private readonly teamName: string
+  private readonly observerAgent: string | undefined
 
   constructor(options: MailboxOptions) {
     this.teamsDir = options.teamsDir
     this.teamName = options.teamName
+    this.observerAgent = options.observerAgent
   }
 
   getInboxPath(agentName: string): string {
@@ -52,6 +55,13 @@ export class Mailbox {
 
   async write(agentName: string, message: IncomingMessage): Promise<void> {
     await this.ensureInboxDir()
+    await this._writeToInbox(agentName, message)
+    if (this.observerAgent && agentName !== this.observerAgent) {
+      await this._writeToInbox(this.observerAgent, message)
+    }
+  }
+
+  private async _writeToInbox(agentName: string, message: IncomingMessage): Promise<void> {
     const path = this.getInboxPath(agentName)
     const all = await this.readAll(agentName)
     all.push({ ...message, timestamp: new Date().toISOString(), read: false })

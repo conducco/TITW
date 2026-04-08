@@ -74,3 +74,34 @@ describe('Mailbox', () => {
     expect(msgs).toEqual([])
   })
 })
+
+describe('Mailbox CC to observerAgent', () => {
+  it('writes a copy to observerAgent inbox when set', async () => {
+    const ccMailbox = new Mailbox({ teamsDir: tempDir, teamName: 'cc-team', observerAgent: 'kgc' })
+    await ccMailbox.write('alice', { from: 'bob', text: 'Hello Alice' })
+
+    const aliceMsgs = await ccMailbox.readAll('alice')
+    const kgcMsgs = await ccMailbox.readAll('kgc')
+
+    expect(aliceMsgs).toHaveLength(1)
+    expect(aliceMsgs[0]?.text).toBe('Hello Alice')
+    expect(kgcMsgs).toHaveLength(1)
+    expect(kgcMsgs[0]?.text).toBe('Hello Alice')
+  })
+
+  it('does NOT CC when the recipient is the observerAgent itself', async () => {
+    const ccMailbox = new Mailbox({ teamsDir: tempDir, teamName: 'cc-team2', observerAgent: 'kgc' })
+    await ccMailbox.write('kgc', { from: 'bob', text: 'Direct to kgc' })
+
+    const kgcMsgs = await ccMailbox.readAll('kgc')
+    expect(kgcMsgs).toHaveLength(1) // not 2
+  })
+
+  it('no CC when observerAgent is not set', async () => {
+    const normalMailbox = new Mailbox({ teamsDir: tempDir, teamName: 'no-cc-team' })
+    await normalMailbox.write('alice', { from: 'bob', text: 'Hello' })
+
+    const aliceMsgs = await normalMailbox.readAll('alice')
+    expect(aliceMsgs).toHaveLength(1)
+  })
+})
