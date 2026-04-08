@@ -18,6 +18,7 @@ export class FileProvider implements IMemoryProvider {
   }
 
   async write(agentType: string, scope: AgentMemoryScope, triples: Triple[]): Promise<void> {
+    if (triples.length === 0) return
     const mem = new AgentMemory({ agentType, cwd: this.options.cwd, memoryBaseDir: this.options.memoryBaseDir })
     const filePath = mem.getMemoryPath(scope)
     const lines = triples.map(t =>

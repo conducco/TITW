@@ -76,7 +76,11 @@ export class TeamOrchestrator {
   }
 
   async broadcast(message: Omit<TeammateMessage, 'timestamp' | 'read'>): Promise<void> {
-    await this.mailbox.broadcast(this.memberNames, message)
+    // Exclude the observer from direct recipients — it receives CCs via Mailbox.write()
+    const recipients = this.team.observerAgent
+      ? this.memberNames.filter(n => n !== this.team.observerAgent)
+      : this.memberNames
+    await this.mailbox.broadcast(recipients, message)
   }
 
   private async _spawnMember(agentConfig: TeamConfig['members'][number]): Promise<void> {

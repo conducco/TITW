@@ -7,6 +7,7 @@ export class ObsidianProvider implements IMemoryProvider {
   constructor(private vaultDir: string) {}
 
   async write(agentType: string, scope: AgentMemoryScope, triples: Triple[]): Promise<void> {
+    if (triples.length === 0) return
     const scopeDir = join(this.vaultDir, scope)
     await mkdir(scopeDir, { recursive: true })
 
@@ -19,7 +20,8 @@ export class ObsidianProvider implements IMemoryProvider {
     }
 
     for (const [subject, group] of bySubject) {
-      const notePath = join(scopeDir, `${subject}.md`)
+      const safeSubject = subject.replace(/[/\\:*?"<>|]/g, '-')
+      const notePath = join(scopeDir, `${safeSubject}.md`)
       const lines = group.map(t =>
         t.weight !== undefined
           ? `- ${t.predicate}: [[${t.object}]] <!-- weight: ${t.weight} -->`
