@@ -134,6 +134,154 @@ const runner: AgentRunner = async ({
 }
 ```
 
+### Swapping LLM Providers
+
+`AgentRunner` is the only place LLM calls happen — the framework never imports or references any SDK. To switch providers, replace the function body. Everything else stays the same.
+
+**Anthropic**
+```ts
+import Anthropic from '@anthropic-ai/sdk'
+import type { AgentRunner } from '@conducco/titw'
+
+const client = new Anthropic()
+
+const TOOLS: Anthropic.Tool[] = [
+  {
+    name: 'send_message',
+    description: 'Send a message to another agent or back to the user.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        to: { type: 'string', description: 'Recipient name — another agent or "user".' },
+        content: { type: 'string', description: 'The message content.' },
+      },
+      required: ['to', 'content'],
+    },
+  },
+]
+
+export const runner: AgentRunner = async (params) => {
+  const messages: Anthropic.MessageParam[] = []
+  if (params.prompt) messages.push({ role: 'user', content: params.prompt })
+
+  let turns = 0
+  let tokenCount = 0
+  let lastOutput = ''
+
+  while (!params.abortSignal.aborted) {
+    const inbox = await params.readMailbox()
+    for (const msg of inbox) {
+      messages.push({ role: 'user', content: `[From ${msg.from}]: ${msg.text}` })
+    }
+
+    const last = messages.at(-1)
+    if (!last || last.role !== 'user') { await new Promise(r => setTimeout(r, 500)); continue }
+    if (turns++ >= params.maxTurns) break
+
+    const res = await client.messages.create({
+      model: params.model,
+      max_tokens: 4096,
+      system: params.systemPrompt,
+      tools: TOOLS,
+      messages,
+      signal: params.abortSignal,
+    })
+
+    messages.push({ role: 'assistant', content: res.content })
+    tokenCount += res.usage.input_tokens + res.usage.output_tokens
+    const text = res.content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+    if (text) lastOutput = text
+
+    const toolResults: Anthropic.ToolResultBlockParam[] = []
+    for (const block of res.content) {
+      if (block.type === 'tool_use' && block.name === 'send_message') {
+        const { to, content } = block.input as { to: string; content: string }
+        await params.sendMessage(to, { from: params.agentId, text: content })
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: `Message delivered to ${to}.` })
+      }
+    }
+    if (toolResults.length > 0) messages.push({ role: 'user', content: toolResults })
+  }
+
+  return { output: lastOutput, toolUseCount: 0, tokenCount, stopReason: params.abortSignal.aborted ? 'aborted' : 'complete' }
+}
+```
+
+**OpenAI**
+```ts
+import OpenAI from 'openai'
+import type { AgentRunner } from '@conducco/titw'
+
+const client = new OpenAI()
+
+const TOOLS: OpenAI.ChatCompletionTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'send_message',
+      description: 'Send a message to another agent or back to the user.',
+      parameters: {
+        type: 'object',
+        properties: {
+          to: { type: 'string', description: 'Recipient name — another agent or "user".' },
+          content: { type: 'string', description: 'The message content.' },
+        },
+        required: ['to', 'content'],
+      },
+    },
+  },
+]
+
+export const runner: AgentRunner = async (params) => {
+  const messages: OpenAI.ChatCompletionMessageParam[] = [
+    { role: 'system', content: params.systemPrompt },
+  ]
+  if (params.prompt) messages.push({ role: 'user', content: params.prompt })
+
+  let turns = 0
+  let tokenCount = 0
+  let lastOutput = ''
+
+  while (!params.abortSignal.aborted) {
+    const inbox = await params.readMailbox()
+    for (const msg of inbox) {
+      messages.push({ role: 'user', content: `[From ${msg.from}]: ${msg.text}` })
+    }
+
+    const last = messages.at(-1)
+    if (!last || last.role !== 'user') { await new Promise(r => setTimeout(r, 500)); continue }
+    if (turns++ >= params.maxTurns) break
+
+    const res = await client.chat.completions.create({
+      model: params.model,
+      messages,
+      tools: TOOLS,
+    })
+
+    const msg = res.choices[0]!.message
+    messages.push(msg)
+    tokenCount += res.usage?.total_tokens ?? 0
+    if (msg.content) lastOutput = msg.content
+
+    for (const call of msg.tool_calls ?? []) {
+      if (call.function.name === 'send_message') {
+        const { to, content } = JSON.parse(call.function.arguments) as { to: string; content: string }
+        await params.sendMessage(to, { from: params.agentId, text: content })
+        messages.push({ role: 'tool', tool_call_id: call.id, content: `Message delivered to ${to}.` })
+      }
+    }
+  }
+
+  return { output: lastOutput, toolUseCount: 0, tokenCount, stopReason: params.abortSignal.aborted ? 'aborted' : 'complete' }
+}
+```
+
+The `params.model` string comes from your `TeamConfig` (`defaultModel` or per-member `model`). Set it to whatever your provider expects — `'claude-opus-4-6'`, `'gpt-4o'`, `'mistral-large-latest'`, etc.
+
+For a deep-dive on routing patterns, fan-out, and common mistakes, see the **[Routing Guide](./docs/routing.md)**.
+
+---
+
 ### Mailbox
 
 File-based persistent messaging between agents. Each agent has its own inbox under `.titw/teams/<team-name>/<agent-name>/inbox.json`.
