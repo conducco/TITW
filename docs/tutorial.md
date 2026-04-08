@@ -1,21 +1,8 @@
-# titw Production Tutorial
+# titw Tutorial
 
 A production-grade multi-agent team — built correctly from the start.
 
-This tutorial covers what the [basic tutorial](./tutorial.md) deliberately skips: **tool-use-based routing** (no fragile text parsing), **error handling with retries**, **graceful shutdown**, and **explicit completion signaling**.
-
-By the end you'll have a runner you can drop into a real product.
-
----
-
-## What makes this different from the basic tutorial
-
-| Basic tutorial | This tutorial |
-|---|---|
-| Routes messages via regex on text | Routes via `send_message` tool call — reliable across all models |
-| No error handling | Exponential backoff on transient API errors |
-| Fixed-timeout completion detection | Lead explicitly signals done via `SEND TO user` tool |
-| No shutdown protocol | `ShutdownNegotiator` for graceful agent termination |
+By the end you'll have a runner you can drop into a real product: tool-use-based routing, error handling with retries, graceful shutdown, and explicit completion signaling.
 
 ---
 
@@ -421,7 +408,7 @@ main().catch(err => {
 
 ---
 
-## Step 4b — Adding MCP tools and skills
+## Step 5 — Adding MCP tools and skills
 
 To give agents access to external tools via MCP servers, add `mcpServers` to any member in your `TeamConfig`. To inject reusable instruction sets, add `skills`. The framework handles connections and prompt assembly automatically.
 
@@ -464,7 +451,7 @@ The runner already handles MCP dispatch from **Step 2** — no further changes n
 
 ---
 
-## Step 5 — Handle shutdown inside the runner
+## Step 6 — Handle shutdown inside the runner
 
 The `ShutdownNegotiator` sends a structured `shutdown_request` message to the lead's inbox. For the lead to respond, the runner needs to recognise and acknowledge it.
 
@@ -507,7 +494,7 @@ for (const msg of inbox) {
 
 ---
 
-## Step 6 — Run it
+## Step 7 — Run it
 
 ```bash
 ANTHROPIC_API_KEY=sk-... npx tsx src/main.ts
