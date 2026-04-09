@@ -83,7 +83,8 @@ Shared infrastructure used throughout:
   Mailbox        — JSON files at {teamsDir}/{team}/inboxes/{agent}.json
   AgentMemory    — markdown files at scoped paths under ~/.titw/ and .titw/
   SkillRegistry  — markdown files loaded once at spawn
-  MCPToolkit     — MCP server connections managed per-agent
+  MCPToolkit      — MCP server connections managed per-agent
+  IMemoryProvider — pluggable read/write backend; defaults to AgentMemory behavior
 ```
 
 ---
@@ -102,6 +103,7 @@ interface TeamConfig {
   members: AgentConfig[]         // at least one member required
   defaultModel?: string          // fallback model for all members
   allowedPaths?: TeamAllowedPath[]  // pre-granted filesystem paths
+  observerAgent?: string             // agent name that receives CC of every team message (KGC pattern)
 }
 
 interface AgentConfig {
@@ -144,6 +146,7 @@ interface AgentRunParams {
   mcpTools: MCPToolSchema[]                                // MCP-discovered tool schemas
   callMcpTool: (name, args) => Promise<unknown>            // dispatch MCP tool call
   onProgress?: (progress: AgentProgress) => void
+  writeMemory?: (triples: Triple[]) => Promise<void>  // only set for the observer agent
 }
 
 interface AgentRunResult {
@@ -186,7 +189,7 @@ orch.activeMemberCount // number
 
 **`start()`** validates the team config, then spawns all members concurrently via `Promise.all`. For each member it:
 1. Resolves the model (`AgentLoader.resolveModel`)
-2. Builds the memory injection (`AgentMemory.buildSystemPromptInjection`)
+2. Builds the memory injection (via `IMemoryProvider.buildSystemPromptInjection` if `memoryProvider` is set, otherwise `AgentMemory`)
 3. Loads skills (`SkillRegistry.load`)
 4. Connects MCP servers (`MCPToolkit.connect`)
 5. Assembles the system prompt: `base + skillInjection + memoryInjection`
@@ -254,6 +257,8 @@ interface TeammateMessage {
 
 **`user` inbox convention**: Messages sent `to: "user"` land in a `user.json` inbox. The orchestrator-side code polls this to detect when the lead has completed the task. This is how multi-agent teams signal completion to external callers.
 
+**Observer CC**: When `TeamConfig.observerAgent` is set, every `Mailbox.write()` call automatically delivers a copy to the observer's inbox in addition to the primary recipient. The observer never appears in any agent's peers list — it is invisible to the team. This is the delivery mechanism for the KGC pattern.
+
 **Structured messages**: Some framework protocols (shutdown negotiation, plan approval, permission requests) use structured payloads serialized as JSON in `text`. `isStructuredMessage()` and `parseStructuredMessage()` detect and deserialize these.
 
 ---
@@ -295,6 +300,69 @@ await memory.write('project', 'Preferred citation format: APA.')
 await memory.append('local', '\n- Checked arXiv 2024-01-15.')
 const content = await memory.read('user')
 ```
+
+`AgentMemory` is the default. To make memory pluggable — and to support runtime writes via a KGC agent — use the Memory Gateway described below.
+
+---
+
+### Memory Gateway — pluggable providers
+
+The Memory Gateway replaces `AgentMemory` with a two-method interface, making storage backends swappable without changing any other code.
+
+```ts
+interface IMemoryProvider {
+  buildSystemPromptInjection(agentType: string, scope: AgentMemoryScope): Promise<string>
+  write(agentType: string, scope: AgentMemoryScope, triples: Triple[]): Promise<void>
+  connect?(): Promise<void>     // optional lifecycle hook (e.g. database connection)
+  disconnect?(): Promise<void>
+}
+
+interface Triple {
+  subject: string
+  predicate: string
+  object: string
+  weight?: number   // default 1.0; used for decay scoring in FalkorProvider
+}
+```
+
+- `buildSystemPromptInjection` — the read path, called at spawn time. Returns an `<agent-memory>` tag or an empty string.
+- `write` — the write path, called by the KGC runner after extracting triples from observed messages.
+
+**Passing a provider**:
+
+```ts
+const orch = new TeamOrchestrator({
+  team,
+  runner,
+  config,
+  cwd: process.cwd(),
+  memoryProvider: new FileProvider({ cwd: process.cwd(), memoryBaseDir: config.memoryBaseDir }),
+})
+```
+
+If `memoryProvider` is absent, the orchestrator falls back to `AgentMemory` — zero breaking changes.
+
+**Three built-in providers**:
+
+| Provider | Import | Storage | Extra deps |
+|----------|--------|---------|------------|
+| `FileProvider` | `@conducco/titw` | Same markdown files as `AgentMemory` | None |
+| `ObsidianProvider` | `@conducco/titw` | One `.md` note per entity with wikilinks | None |
+| `FalkorProvider` | `@conducco/titw/falkor` | Redis graph database with time-decay scoring | `falkordb` |
+
+**The KGC pattern**: Set `TeamConfig.observerAgent: 'kgc'` to nominate an agent that receives a silent CC of every message. The framework passes `writeMemory` only to that agent's runner. The runner extracts triples from the observed messages and calls `params.writeMemory(triples)`. The provider persists them; subsequent spawns see the accumulated knowledge via `buildSystemPromptInjection`.
+
+```ts
+// In the KGC runner — the framework sets writeMemory only for the observer agent
+const triples = tryParseTriples(response.text)
+if (triples && params.writeMemory) {
+  await params.writeMemory(triples)
+}
+```
+
+**FalkorProvider lifecycle**: Because it manages a Redis connection, call `connect()` before `orch.start()` and `disconnect()` after `orch.stop()`. The decay formula is `score = weight × λ^(age_in_days)`; the top 50 results by score are injected at spawn time. No triples are ever deleted.
+
+See `docs/memory-gateway.md` for full usage examples and common mistakes.
 
 ---
 
@@ -488,6 +556,8 @@ The three-tier structure separates concerns:
 
 Memory is plain text (markdown). Agents can write to their own memory during a run using the `AgentMemory` API; the orchestrator can write before the run to seed context.
 
+For runtime knowledge extraction, the Memory Gateway adds a write path: a KGC observer agent receives every team message, extracts typed triples, and writes them via `IMemoryProvider.write()`. On the next spawn, `buildSystemPromptInjection` injects the accumulated triples — no manual seeding required. Backends (`FileProvider`, `ObsidianProvider`, `FalkorProvider`) are swappable without touching the runner or team config.
+
 ### Answers — how agents respond
 
 Agents produce responses by calling the `send_message` tool. This is the only routing mechanism. The model cannot route by formatting text correctly — it must make a structured tool call that names the recipient explicitly.
@@ -579,6 +649,31 @@ module.exports = {
 skills: ['@myorg/skill-careful-researcher']
 ```
 
+### Custom IMemoryProvider
+
+Implement `IMemoryProvider` to store agent knowledge in any backend — vector databases, graph databases, external APIs — without changing the runner or team config:
+
+```ts
+import type { IMemoryProvider, Triple, AgentMemoryScope } from '@conducco/titw'
+
+class MyProvider implements IMemoryProvider {
+  async buildSystemPromptInjection(agentType: string, scope: AgentMemoryScope): Promise<string> {
+    const facts = await myBackend.query(scope)
+    return facts.length
+      ? `<agent-memory scope="${scope}">\n${facts.join('\n')}\n</agent-memory>`
+      : ''
+  }
+
+  async write(agentType: string, scope: AgentMemoryScope, triples: Triple[]): Promise<void> {
+    await myBackend.upsert(triples)
+  }
+}
+
+const orch = new TeamOrchestrator({ team, runner, config, cwd, memoryProvider: new MyProvider() })
+```
+
+If your provider manages a connection, implement `connect()` and `disconnect()` and call them around `orch.start()` / `orch.stop()`.
+
 ---
 
 ## Configuration Reference
@@ -664,6 +759,11 @@ createPermissionRequest/Response()
 
 // Memory
 AgentMemory                   // 3-tier persistent memory
+IMemoryProvider               // pluggable read/write interface
+Triple                        // { subject, predicate, object, weight? }
+FileProvider                  // markdown files (same paths as AgentMemory)
+ObsidianProvider              // Obsidian vault, one note per entity with wikilinks
+// FalkorProvider              — import from '@conducco/titw/falkor' (optional peer: falkordb)
 
 // Skills
 SkillRegistry                 // markdown skill loader

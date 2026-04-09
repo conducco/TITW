@@ -529,6 +529,259 @@ Team stopped.
 
 ---
 
+## Step 8 — Memory Gateway (default: FileProvider + KGC)
+
+The `AgentMemory.write()` call in Step 4 seeds memory manually before a run. The Memory Gateway adds a **runtime write path**: an observer agent (the KGC) silently receives every team message, extracts knowledge triples, and stores them via a pluggable provider. Future runs see accumulated knowledge without manual seeding.
+
+Three pieces to wire:
+
+1. A **provider** — where memory is stored
+2. An **observer agent** declared on `TeamConfig.observerAgent`
+3. A **KGC runner branch** that reads observed messages, extracts triples, and calls `params.writeMemory`
+
+`FileProvider` (the default option) stores triples in the same markdown files `AgentMemory` already uses — no new formats, no new dependencies.
+
+### Add the KGC agent to your team config
+
+Update `src/team.ts`:
+
+```ts
+import type { TeamConfig } from '@conducco/titw'
+
+export const team: TeamConfig = {
+  name: 'research-team',
+  leadAgentName: 'lead',
+  defaultModel: 'claude-opus-4-6',
+  observerAgent: 'kgc',            // every team message is CC'd to this agent
+
+  members: [
+    // lead, researcher, writer from Step 3 — unchanged
+
+    {
+      name: 'kgc',
+      model: 'claude-haiku-4-5-20251001',   // cheap — extraction only
+      memory: 'project',                     // controls which scope write() targets
+      systemPrompt: `
+You observe all messages in this team. Extract factual triples as JSON.
+Output ONLY a JSON array — no other text:
+[{"subject":"...","predicate":"...","object":"...","weight":0.8}]
+Never send messages to other agents.
+      `.trim(),
+    },
+  ],
+}
+```
+
+### Pass FileProvider to the orchestrator
+
+Update `src/main.ts`:
+
+```ts
+import {
+  TeamOrchestrator,
+  createConfig,
+  FileProvider,
+  Mailbox,
+  sanitizeName,
+} from '@conducco/titw'
+import { team } from './team.js'
+import { runner } from './runner.js'
+
+async function main() {
+  const config = createConfig()
+  // ...mailbox clear + AgentMemory seed (unchanged from Step 4)...
+
+  const orch = new TeamOrchestrator({
+    team,
+    runner,
+    config,
+    cwd: process.cwd(),
+    memoryProvider: new FileProvider({
+      cwd: process.cwd(),
+      memoryBaseDir: config.memoryBaseDir,
+    }),
+  })
+
+  await orch.start()
+  // ...rest unchanged...
+}
+```
+
+### Add a KGC branch to your runner
+
+Rename the existing `export const runner` in `src/runner.ts` to `const mainRunner`, then append:
+
+```ts
+function tryParseTriples(text: string) {
+  try {
+    const parsed = JSON.parse(text.trim())
+    if (Array.isArray(parsed)) return parsed
+  } catch { /* not JSON */ }
+  return null
+}
+
+const kgcRunner: AgentRunner = async (params) => {
+  const inbox = await params.readMailbox()
+  if (inbox.length === 0) {
+    return { output: '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
+  }
+
+  const observed = inbox.map(m => `[${m.from}]: ${m.text}`).join('\n\n')
+
+  const response = await withRetry(() =>
+    client.messages.create({
+      model: params.model,
+      max_tokens: 2048,
+      system: params.systemPrompt,
+      messages: [{ role: 'user', content: observed }],
+    }),
+  )
+
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map(b => b.text)
+    .join('\n')
+
+  const triples = tryParseTriples(text)
+  if (triples && params.writeMemory) {
+    await params.writeMemory(triples)
+  }
+
+  return {
+    output: text,
+    toolUseCount: 0,
+    tokenCount: response.usage.input_tokens + response.usage.output_tokens,
+    stopReason: 'complete',
+  }
+}
+
+// Dispatcher — routes KGC agent to its own runner
+export const runner: AgentRunner = async (params) => {
+  if (params.agentId.startsWith('kgc@')) return kgcRunner(params)
+  return mainRunner(params)
+}
+```
+
+After each run, extracted triples are appended to the project memory file:
+
+```
+- Actor Model invented-by Carl Hewitt (weight: 0.9)
+- Erlang implements Actor Model (weight: 0.8)
+- Akka uses Actor Model (weight: 0.85)
+```
+
+At the next spawn, `FileProvider` injects them into the agent's system prompt inside `<agent-memory>` tags — alongside anything already in the file.
+
+---
+
+## Step 9 — Obsidian memory
+
+To write knowledge into an Obsidian vault, swap the provider in `src/main.ts`. The KGC agent, team config, and runner are unchanged.
+
+```ts
+import { TeamOrchestrator, createConfig, ObsidianProvider } from '@conducco/titw'
+
+const orch = new TeamOrchestrator({
+  team,
+  runner,
+  config,
+  cwd: process.cwd(),
+  memoryProvider: new ObsidianProvider('/Users/you/vault'),
+})
+```
+
+Each subject entity gets its own note, using Obsidian wikilinks for relationships:
+
+```markdown
+<!-- /Users/you/vault/project/Actor-Model.md -->
+- invented-by: [[Carl Hewitt]]
+- implemented-by: [[Erlang]] <!-- weight: 0.8 -->
+- implemented-by: [[Akka]] <!-- weight: 0.85 -->
+```
+
+Scope (`user` / `project` / `local`) maps to a subdirectory inside the vault. `buildSystemPromptInjection` reads all `.md` files in the scope subdirectory and injects them at spawn time. The vault graph view shows entity relationships natively — no extra tooling required.
+
+**Vault layout:**
+
+```
+/Users/you/vault/
+  project/
+    Actor-Model.md
+    Carl-Hewitt.md
+    Erlang.md
+  user/
+    (agent personal memory)
+```
+
+---
+
+## Step 10 — FalkorDB memory
+
+FalkorDB stores triples as graph edges and retrieves them with time-decay scoring: older facts rank lower without ever being deleted. Useful when agent knowledge evolves over time — stale facts fade out of context rather than accumulating noise.
+
+**Install the optional peer dependency:**
+
+```bash
+npm install falkordb
+```
+
+**Start FalkorDB locally with Docker:**
+
+```bash
+docker run -p 6379:6379 falkordb/falkordb
+```
+
+**Import from the sub-path export and add connection lifecycle:**
+
+```ts
+import { TeamOrchestrator, createConfig } from '@conducco/titw'
+import { FalkorProvider } from '@conducco/titw/falkor'
+import { team } from './team.js'
+import { runner } from './runner.js'
+
+async function main() {
+  const config = createConfig()
+  // ...mailbox clear + AgentMemory seed (unchanged from Step 4)...
+
+  const provider = new FalkorProvider({
+    url: 'redis://localhost:6379',
+    graphName: 'research-team',
+    lambda: 0.95,   // decay factor — optional, default 0.95 (~14-day half-life)
+  })
+
+  await provider.connect()   // must be called before orch.start()
+
+  const orch = new TeamOrchestrator({
+    team,
+    runner,
+    config,
+    cwd: process.cwd(),
+    memoryProvider: provider,
+  })
+
+  await orch.start()
+  // ...run team, wait for result...
+
+  await orch.stop()
+  await provider.disconnect()   // must be called after orch.stop()
+}
+```
+
+**Decay formula:** `score = weight × λ^(age_in_days)`
+
+At spawn time the 50 highest-scoring triples are injected. A triple written today with `weight: 1.0` and `λ = 0.95` scores `0.95` after 1 day, `0.77` after 5 days, `0.60` after 10 days.
+
+| λ | Approximate half-life |
+|---|----------------------|
+| 0.99 | ~69 days |
+| 0.95 | ~14 days |
+| 0.90 | ~7 days |
+| 0.80 | ~3 days |
+
+Facts are never deleted — decay affects ranking only.
+
+---
+
 ## Swapping providers
 
 Only `src/runner.ts` changes. The framework, team config, and orchestration are identical.
@@ -591,3 +844,4 @@ The `params.model` value comes directly from your `TeamConfig` — set it to wha
 - **Typed structured messages** — use `createPlanApprovalRequest` / `createPermissionRequest` from `@conducco/titw` for lead-worker coordination instead of free-text
 - **Custom backend** — implement `TeammateExecutor` to run agents in Docker containers or remote workers
 - **Prompt cache sharing** — use `buildCacheablePrefix` for byte-identical system prompt prefixes across fork children to maximise LLM cache hit rates
+- **Custom memory provider** — implement `IMemoryProvider` to write triples to any backend (vector DB, SQL, external service)

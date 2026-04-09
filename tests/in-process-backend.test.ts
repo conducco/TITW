@@ -100,12 +100,17 @@ describe('InProcessBackend', () => {
   })
 
   it('sendMessage delivers to running agent mailbox', async () => {
-    // Spawn a runner that waits briefly then reads its mailbox
     let receivedMsg: string | undefined
+    let resolveIdle!: () => void
+    const idlePromise = new Promise<void>(resolve => { resolveIdle = resolve })
+
+    // Runner polls until it receives a message — same pattern as a real agent.
     const listeningRunner: AgentRunner = async (params) => {
-      // Small delay to ensure sendMessage fires after spawn returns
-      await new Promise(r => setTimeout(r, 20))
-      const msgs = await params.readMailbox()
+      let msgs = await params.readMailbox()
+      while (msgs.length === 0) {
+        await new Promise(r => setTimeout(r, 10))
+        msgs = await params.readMailbox()
+      }
       receivedMsg = msgs[0]?.text
       return { output: receivedMsg ?? '', toolUseCount: 0, tokenCount: 0, stopReason: 'complete' }
     }
@@ -120,11 +125,11 @@ describe('InProcessBackend', () => {
       parentId: 'parent-123',
       runner: listeningRunner,
       titwCfg: createConfig({ teamsDir: join(tempDir, 'teams') }),
+      onIdle: () => resolveIdle(),
     }
     await backend.spawn(config)
     await backend.sendMessage('listener@test-team', { from: 'lead', text: 'Hello listener!' })
-    // Wait for the runner to finish
-    await new Promise(r => setTimeout(r, 100))
+    await idlePromise  // wait for the runner to actually finish, not an arbitrary timeout
     expect(receivedMsg).toBe('Hello listener!')
   })
 
