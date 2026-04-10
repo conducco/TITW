@@ -836,7 +836,7 @@ for (const call of toolCalls) {
 
 The `params.model` value comes directly from your `TeamConfig` — set it to whatever your provider expects.
 
-**Azure AI Foundry example** — keep the same `@anthropic-ai/sdk` and tool schema, just swap the client config:
+**Azure AI Foundry example** — if you are on the `@anthropic-ai/sdk` path (rather than OpenAI above), you can target Azure AI Foundry by swapping only the client config:
 
 ```ts
 import Anthropic from '@anthropic-ai/sdk'
