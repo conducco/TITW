@@ -42,6 +42,7 @@ export class Mailbox {
     const path = this.getInboxPath(agentName)
     try {
       const content = await readFile(path, 'utf-8')
+      if (!content.trim()) return []  // guard against empty file during concurrent write
       return JSON.parse(content) as TeammateMessage[]
     } catch (err: unknown) {
       if (isEnoent(err)) return []
