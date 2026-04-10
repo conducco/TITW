@@ -78,7 +78,7 @@ export const team: TeamConfig = {
 }
 ```
 
-The deployment name is passed through `params.model` to your `client.messages.create({ model: params.model, ... })` call unchanged.
+In your `AgentRunner`, `params.model` carries the value from `TeamConfig.defaultModel` (or the per-agent `model` field). It is passed directly to `client.messages.create({ model: params.model, ... })` — unchanged.
 
 ---
 
@@ -105,7 +105,7 @@ AZURE_AI_ENDPOINT=https://... AZURE_AI_API_KEY=... npx tsx src/main.ts
 The SDK is sending the wrong auth header. Confirm you are using `buildAzureFoundryClientConfig` and not constructing `new Anthropic()` directly. The `api-key` header must be set.
 
 **404 Not Found**
-The `baseURL` doesn't match Azure's expected path. Copy the Target URI exactly from the portal. Do not append `/messages` or `/v1` manually — the SDK handles path construction.
+The `baseURL` doesn't match the path Azure expects. Copy the **Target URI** exactly from the portal — do not modify it. If the portal's "View Code" section shows a different base URL than the Target URI, use the one from "View Code". Do not manually append `/messages` or `/v1`; if requests still 404 after copying the URL exactly, check whether Azure exposed the endpoint under an `/anthropic` sub-path (e.g. `…/models/anthropic`) and update `AZURE_AI_ENDPOINT` to that sub-path.
 
 **Model not found / deployment not found**
 `params.model` (from `TeamConfig.defaultModel`) must exactly match your **Deployment Name** in Foundry — not the underlying model identifier (e.g. `my-claude-sonnet`, not `claude-3-5-sonnet-20241022`).
