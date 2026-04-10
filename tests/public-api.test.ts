@@ -16,6 +16,7 @@ import {
   PermissionBridge,
   buildCacheablePrefix, isForkBoilerplatePresent, injectForkBoilerplate, FORK_BOILERPLATE_MARKER,
   ShutdownNegotiator, SHUTDOWN_TIMEOUT_MS,
+  buildAzureFoundryClientConfig,
 } from '../src/index.js'
 
 describe('public API surface', () => {
@@ -50,6 +51,8 @@ describe('public API surface', () => {
   it('exports FORK_BOILERPLATE_MARKER', () => expect(typeof FORK_BOILERPLATE_MARKER).toBe('string'))
   it('exports ShutdownNegotiator class', () => expect(ShutdownNegotiator).toBeDefined())
   it('exports SHUTDOWN_TIMEOUT_MS', () => expect(SHUTDOWN_TIMEOUT_MS).toBeGreaterThan(0))
+  it('exports buildAzureFoundryClientConfig', () =>
+    expect(typeof buildAzureFoundryClientConfig).toBe('function'))
 
   it('exports SkillRegistry', async () => {
     const { SkillRegistry } = await import('../src/index.js')

@@ -95,3 +95,7 @@ export type { CacheablePrefix, ConversationMessage } from './patterns/cacheShari
 
 export { ShutdownNegotiator, SHUTDOWN_TIMEOUT_MS } from './patterns/shutdown.js'
 export type { ShutdownNegotiatorOptions, ShutdownResult } from './patterns/shutdown.js'
+
+// Providers — LLM client configuration helpers
+export { buildAzureFoundryClientConfig } from './providers/azureFoundry.js'
+export type { AzureFoundryOptions, AzureFoundryClientConfig } from './providers/azureFoundry.js'
