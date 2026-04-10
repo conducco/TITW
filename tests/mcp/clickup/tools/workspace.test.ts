@@ -21,25 +21,36 @@ describe('workspace tools', () => {
 
   it('listSpaces calls GET /team/:id/space', async () => {
     const client = mockClient({ spaces: [] })
-    await listSpaces(client, 'team1', false)
+    const result = await listSpaces(client, 'team1', false)
     expect(client.get).toHaveBeenCalledWith('/team/team1/space', { archived: 'false' })
+    expect(result).toEqual({ spaces: [] })
   })
 
   it('listFolders calls GET /space/:id/folder', async () => {
     const client = mockClient({ folders: [] })
-    await listFolders(client, 'space1', false)
+    const result = await listFolders(client, 'space1', false)
     expect(client.get).toHaveBeenCalledWith('/space/space1/folder', { archived: 'false' })
+    expect(result).toEqual({ folders: [] })
   })
 
   it('listLists with folder_id calls GET /folder/:id/list', async () => {
     const client = mockClient({ lists: [] })
-    await listLists(client, { folder_id: 'folder1', archived: false })
+    const result = await listLists(client, { folder_id: 'folder1', archived: false })
     expect(client.get).toHaveBeenCalledWith('/folder/folder1/list', { archived: 'false' })
+    expect(result).toEqual({ lists: [] })
   })
 
   it('listLists with space_id calls GET /space/:id/list (folderless)', async () => {
     const client = mockClient({ lists: [] })
-    await listLists(client, { space_id: 'space1', archived: false })
+    const result = await listLists(client, { space_id: 'space1', archived: false })
     expect(client.get).toHaveBeenCalledWith('/space/space1/list', { archived: 'false' })
+    expect(result).toEqual({ lists: [] })
+  })
+
+  it('listLists throws when neither folder_id nor space_id is provided', async () => {
+    const client = mockClient({})
+    await expect(listLists(client, { archived: false })).rejects.toThrow(
+      'Either folder_id or space_id is required',
+    )
   })
 })
