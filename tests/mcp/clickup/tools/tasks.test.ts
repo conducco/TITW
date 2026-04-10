@@ -6,6 +6,8 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  addTag,
+  removeTag,
 } from '../../../../src/mcp/clickup/tools/tasks.js'
 
 function mockClient(overrides: Partial<ClickUpClient> = {}): ClickUpClient {
@@ -60,6 +62,20 @@ describe('task tools', () => {
     const client = mockClient()
     const result = await deleteTask(client, 'task1')
     expect(client.delete).toHaveBeenCalledWith('/task/task1')
+    expect(result).toBeUndefined()
+  })
+
+  it('addTag calls POST /task/:id/tag/:name', async () => {
+    const client = mockClient({ post: vi.fn().mockResolvedValue({}) })
+    const result = await addTag(client, 'task1', 'ready')
+    expect(client.post).toHaveBeenCalledWith('/task/task1/tag/ready', {})
+    expect(result).toEqual({})
+  })
+
+  it('removeTag calls DELETE /task/:id/tag/:name', async () => {
+    const client = mockClient()
+    const result = await removeTag(client, 'task1', 'ready')
+    expect(client.delete).toHaveBeenCalledWith('/task/task1/tag/ready')
     expect(result).toBeUndefined()
   })
 })

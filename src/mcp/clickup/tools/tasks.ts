@@ -60,6 +60,23 @@ export async function deleteTask(client: ClickUpClient, task_id: string): Promis
   return client.delete(`/task/${task_id}`)
 }
 
+export async function addTag(
+  client: ClickUpClient,
+  task_id: string,
+  tag_name: string,
+): Promise<unknown> {
+  // ClickUp add-tag endpoint takes no body — we send {} which is ignored
+  return client.post(`/task/${task_id}/tag/${tag_name}`, {})
+}
+
+export async function removeTag(
+  client: ClickUpClient,
+  task_id: string,
+  tag_name: string,
+): Promise<void> {
+  return client.delete(`/task/${task_id}/tag/${tag_name}`)
+}
+
 // ─── MCP registration ──────────────────────────────────────────────────────────
 
 function text(data: unknown) {
@@ -137,5 +154,24 @@ export function registerTaskTools(server: McpServer, client: ClickUpClient): voi
   }, async ({ task_id }) => {
     await deleteTask(client, task_id)
     return text({ deleted: true, task_id })
+  })
+
+  server.registerTool('add_tag', {
+    description: 'Add a tag to a ClickUp task by name. Creates the tag in the workspace if it does not exist.',
+    inputSchema: z.object({
+      task_id: z.string().describe('Task ID'),
+      tag_name: z.string().describe('Tag name to add (e.g. "ready")'),
+    }),
+  }, async ({ task_id, tag_name }) => text(await addTag(client, task_id, tag_name)))
+
+  server.registerTool('remove_tag', {
+    description: 'Remove a tag from a ClickUp task by name.',
+    inputSchema: z.object({
+      task_id: z.string().describe('Task ID'),
+      tag_name: z.string().describe('Tag name to remove'),
+    }),
+  }, async ({ task_id, tag_name }) => {
+    await removeTag(client, task_id, tag_name)
+    return text({ removed: true, task_id, tag_name })
   })
 }
