@@ -184,3 +184,9 @@ DeepSeek's tool format uses `parameters` (not `input_schema`) and wraps tools as
 
 **Model not available in catalog**
 Not all DeepSeek versions are listed in every Azure region. Check the current catalog in your Foundry project.
+
+---
+
+## Using with Azure Container Apps deployment
+
+If you are deploying titw to Azure Container Apps (see `docs/deployment-azure-container-apps.md`), store `AZURE_AI_DEEPSEEK_ENDPOINT` and `AZURE_AI_DEEPSEEK_KEY` in Key Vault and inject them into the Container Apps Job as secrets — same pattern as `ANTHROPIC_API_KEY` in that guide.
